@@ -1,0 +1,16 @@
+[project]
+name = "aurora-introductory-workshop"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "adlfs>=2025.8.0",
+    "azure-ai-ml>=1.31.0",
+    "azure-identity>=1.25.1",
+    "dask>=2025.12.0",
+    "fsspec>=2025.12.0",
+    "gcsfs>=2025.12.0",
+    "xarray>=2025.12.0",
+    "zarr>=3.1.5",
+]
