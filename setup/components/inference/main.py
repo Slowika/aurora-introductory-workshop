@@ -3,14 +3,15 @@
 import argparse
 from datetime import datetime
 
-import numpy as np
 import torch
 import xarray as xr
-from aurora import Batch, rollout
+from aurora import rollout
 from dask import config as dask_config
 
+# NOTE: enable imports in local and remote environments
 try:
     from common.utils import (
+        batch_to_xarray,
         create_logger,
         load_batch_from_asset,
         load_model,
@@ -18,6 +19,7 @@ try:
     )
 except ImportError:
     from setup.components.common.utils import (
+        batch_to_xarray,
         create_logger,
         load_batch_from_asset,
         load_model,
@@ -26,60 +28,6 @@ except ImportError:
 
 LOG = create_logger()
 dask_config.set(scheduler="threads", num_workers=10)
-
-
-def batch_to_xarray(batch: Batch) -> xr.Dataset:
-    """Convert a Batch to an xarray Dataset.
-
-    Parameters
-    ----------
-    batch : aurora.Batch
-        Batch to convert.
-
-    Returns
-    -------
-    xarray.Dataset
-        Converted xarray Dataset.
-
-    """
-    return xr.Dataset(
-        data_vars={
-            "2t": (("time", "lat", "lon"), batch.surf_vars["2t"].squeeze(0).numpy()),
-            "10u": (("time", "lat", "lon"), batch.surf_vars["10u"].squeeze(0).numpy()),
-            "10v": (("time", "lat", "lon"), batch.surf_vars["10v"].squeeze(0).numpy()),
-            "msl": (("time", "lat", "lon"), batch.surf_vars["msl"].squeeze(0).numpy()),
-            "lsm": (("lat", "lon"), batch.static_vars["lsm"].numpy()),
-            "z": (("lat", "lon"), batch.static_vars["z"].numpy()),
-            "slt": (("lat", "lon"), batch.static_vars["slt"].numpy()),
-            "z_atmos": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["z"].squeeze(0).numpy(),
-            ),
-            "u": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["u"].squeeze(0).numpy(),
-            ),
-            "v": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["v"].squeeze(0).numpy(),
-            ),
-            "t": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["t"].squeeze(0).numpy(),
-            ),
-            "q": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["q"].squeeze(0).numpy(),
-            ),
-        },
-        coords={
-            "lat": (("lat",), batch.metadata.lat.numpy()),
-            "lon": (("lon",), batch.metadata.lon.numpy()),
-            "time": (("time",), [batch.metadata.time[0]]),
-            "level": (("level",), np.array(batch.metadata.atmos_levels)),
-        },
-    )
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aurora Inference Component")

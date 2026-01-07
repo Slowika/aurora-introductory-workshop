@@ -3,9 +3,27 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone  # UTC alias added py 3.11
 
+import numpy as np
 import torch
 import xarray as xr
 from aurora import AuroraPretrained, Batch, Metadata
+
+
+def create_logger() -> logging.Logger:
+    """Create a configured logger.
+
+    Returns
+    -------
+    logging.Logger
+        Configured logger.
+
+    """
+    logging.basicConfig(
+        stream=sys.stdout,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
+    return logging.getLogger(__name__)
 
 
 def load_model(model_path: str) -> AuroraPretrained:
@@ -75,18 +93,54 @@ def load_batch_from_asset(data_path: str, start_datetime: datetime) -> Batch:
     )
 
 
-def create_logger() -> logging.Logger:
-    """Create a configured logger.
+def batch_to_xarray(batch: Batch) -> xr.Dataset:
+    """Convert a Batch to an xarray Dataset.
+
+    Parameters
+    ----------
+    batch : aurora.Batch
+        Batch to convert.
 
     Returns
     -------
-    logging.Logger
-        Configured logger.
+    xarray.Dataset
+        Converted xarray Dataset.
 
     """
-    logging.basicConfig(
-        stream=sys.stdout,
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s",
+    return xr.Dataset(
+        data_vars={
+            "2t": (("time", "lat", "lon"), batch.surf_vars["2t"].squeeze(0).numpy()),
+            "10u": (("time", "lat", "lon"), batch.surf_vars["10u"].squeeze(0).numpy()),
+            "10v": (("time", "lat", "lon"), batch.surf_vars["10v"].squeeze(0).numpy()),
+            "msl": (("time", "lat", "lon"), batch.surf_vars["msl"].squeeze(0).numpy()),
+            "lsm": (("lat", "lon"), batch.static_vars["lsm"].numpy()),
+            "z": (("lat", "lon"), batch.static_vars["z"].numpy()),
+            "slt": (("lat", "lon"), batch.static_vars["slt"].numpy()),
+            "z_atmos": (
+                ("time", "level", "lat", "lon"),
+                batch.atmos_vars["z"].squeeze(0).numpy(),
+            ),
+            "u": (
+                ("time", "level", "lat", "lon"),
+                batch.atmos_vars["u"].squeeze(0).numpy(),
+            ),
+            "v": (
+                ("time", "level", "lat", "lon"),
+                batch.atmos_vars["v"].squeeze(0).numpy(),
+            ),
+            "t": (
+                ("time", "level", "lat", "lon"),
+                batch.atmos_vars["t"].squeeze(0).numpy(),
+            ),
+            "q": (
+                ("time", "level", "lat", "lon"),
+                batch.atmos_vars["q"].squeeze(0).numpy(),
+            ),
+        },
+        coords={
+            "lat": (("lat",), batch.metadata.lat.numpy()),
+            "lon": (("lon",), batch.metadata.lon.numpy()),
+            "time": (("time",), [batch.metadata.time[0]]),
+            "level": (("level",), np.array(batch.metadata.atmos_levels)),
+        },
     )
-    return logging.getLogger(__name__)
