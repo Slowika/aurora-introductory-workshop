@@ -1,4 +1,5 @@
-"""Common utility functions for inference and training."""
+"""Common utility logic."""
+
 import logging
 import sys
 from datetime import datetime, timedelta, timezone  # UTC alias added py 3.11
@@ -7,6 +8,8 @@ import numpy as np
 import torch
 import xarray as xr
 from aurora import AuroraPretrained, Batch, Metadata
+
+from .constants import ATMOS_VAR_MAP, SFC_VAR_MAP, STATIC_VAR_MAP
 
 
 def create_logger() -> logging.Logger:
@@ -82,13 +85,22 @@ def load_batch_from_asset(data_path: str, start_datetime: datetime) -> Batch:
     prev_datetime = start_datetime - timedelta(hours=6)
     ds_sel = ds.sel(time=[prev_datetime, start_datetime])
     return Batch(
-        surf_vars={},
-        static_vars={},
-        atmos_vars={},
+        surf_vars={
+            k: torch.from_numpy(ds_sel[v].values).unsqueeze(0)
+            for k, v in SFC_VAR_MAP.items()
+        },
+        static_vars={
+            k: torch.from_numpy(ds_sel[v].values) for k, v in STATIC_VAR_MAP.items()
+        },
+        atmos_vars={
+            k: torch.from_numpy(ds_sel[v].values).unsqueeze(0)
+            for k, v in ATMOS_VAR_MAP.items()
+        },
         metadata=Metadata(
-            lat="",
-            lon="",
-            atmos_levels=[],
+            lat=torch.from_numpy(ds_sel["latitude"].values),
+            lon=torch.from_numpy(ds_sel["longitude"].values),
+            time=(start_datetime,),
+            atmos_levels=ds_sel["level"].values.tolist(),
         ),
     )
 
@@ -107,36 +119,19 @@ def batch_to_xarray(batch: Batch) -> xr.Dataset:
         Converted xarray Dataset.
 
     """
+    surf_vars = {
+        k: (("time", "lat", "lon"), v.squeeze(0).numpy())
+        for k, v in batch.surf_vars.items()
+    }
+    static_vars = {
+        k: (("lat", "lon"), v.numpy()) for k, v in batch.static_vars.items()
+    }
+    atmos_vars = {
+        f"{k}_atmos": (("time", "level", "lat", "lon"), v.squeeze(0).numpy())
+        for k, v in batch.atmos_vars.items()
+    }
     return xr.Dataset(
-        data_vars={
-            "2t": (("time", "lat", "lon"), batch.surf_vars["2t"].squeeze(0).numpy()),
-            "10u": (("time", "lat", "lon"), batch.surf_vars["10u"].squeeze(0).numpy()),
-            "10v": (("time", "lat", "lon"), batch.surf_vars["10v"].squeeze(0).numpy()),
-            "msl": (("time", "lat", "lon"), batch.surf_vars["msl"].squeeze(0).numpy()),
-            "lsm": (("lat", "lon"), batch.static_vars["lsm"].numpy()),
-            "z": (("lat", "lon"), batch.static_vars["z"].numpy()),
-            "slt": (("lat", "lon"), batch.static_vars["slt"].numpy()),
-            "z_atmos": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["z"].squeeze(0).numpy(),
-            ),
-            "u": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["u"].squeeze(0).numpy(),
-            ),
-            "v": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["v"].squeeze(0).numpy(),
-            ),
-            "t": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["t"].squeeze(0).numpy(),
-            ),
-            "q": (
-                ("time", "level", "lat", "lon"),
-                batch.atmos_vars["q"].squeeze(0).numpy(),
-            ),
-        },
+        data_vars=surf_vars | static_vars | atmos_vars,
         coords={
             "lat": (("lat",), batch.metadata.lat.numpy()),
             "lon": (("lon",), batch.metadata.lon.numpy()),
