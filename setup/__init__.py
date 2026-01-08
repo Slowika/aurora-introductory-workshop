@@ -1,4 +1,11 @@
-"""Init env vars for session without third-party dotenv."""
+"""Init temporary (session) environment variables from .env without third-party dotenv.
+
+This file is used to inject environment variables set in the .env file in the project
+root (i.e. aurora-introductory-workshop/.env) into the session's os.environ dictionary,
+serving as temporary environment variables with no clean-up required.
+
+This will be run when any code below /setup/ is imported.
+"""
 
 import os
 from pathlib import Path

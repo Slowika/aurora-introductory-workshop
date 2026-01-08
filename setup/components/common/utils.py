@@ -30,7 +30,7 @@ def create_logger() -> logging.Logger:
 
 
 def load_model(model_path: str, *, train: bool) -> AuroraPretrained:
-    """Load the Aurora model from a local checkpoint.
+    """Load an Aurora model from a local checkpoint.
 
     Parameters
     ----------
@@ -78,12 +78,12 @@ def make_lowres_batch(start_datetime: datetime) -> Batch:
 
 
 def load_batch_from_asset(data_path: str, start_datetime: datetime) -> Batch:
-    """Load a Batch from a local Azure ML data asset.
+    """Load a Batch from a local (mounted or downloaded) Azure ML data asset.
 
     Parameters
     ----------
     data_path : str
-        Path to the data asset, locally mounted or downloaded.
+        Path to the data asset.
     start_datetime : datetime.datetime
         Start datetime for the batch.
 

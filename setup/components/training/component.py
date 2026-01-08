@@ -1,4 +1,10 @@
-"""Aurora fine-tuning Azure ML Component definition."""
+"""Aurora fine-tuning Azure Machine Learning (AML) Component definition.
+
+Simply run this script to create or update the component in an AML workspace.
+By default, the workspace parameters (subscription_id, resource_group_name,
+workspace_name) are retrieved from temporary environment variables defined in ./.env -
+see ./.template.env for details on creating this file.
+"""
 
 from azure.ai.ml import Input, Output
 from azure.ai.ml.entities import CommandComponent
@@ -8,7 +14,7 @@ from setup.common.utils import create_mlclient
 if __name__ == "__main__":
     component = CommandComponent(
         name="aurora-finetuning",
-        description="Component for performing fine-tuning using with Aurora.",
+        description="Component for performing Aurora fine-tuning.",
         version="1",
         command=(
             "python -m main "
@@ -18,7 +24,7 @@ if __name__ == "__main__":
             "--loss ${{outputs.loss}} "
             "--prediction ${{outputs.prediction}}"
         ),
-        code="./setup/components/training/main.py",
+        code="./setup/components/training/",
         environment="aurora-inference:1",
         inputs={
             "model": Input(
@@ -61,6 +67,7 @@ if __name__ == "__main__":
         },
         instance_count=1,
         is_deterministic=True,
+        # include common utils and constants for use in remote code
         additional_includes=["./setup/components/common/"],
     )
     mlc = create_mlclient(local=True)

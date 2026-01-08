@@ -1,4 +1,22 @@
-"""Aurora inference script."""
+"""Aurora inference script.
+
+This script takes a set of arguments through the command line to perform autoregressive
+forecasting using a pretrained Aurora model, local initial state date OR synthetic test
+data, a starting datetime, and the number of steps to perform. All generated forecasts
+are written to a NetCDF file at the specified output path.
+
+Running locally:
+    python -m setup.components.inference.main \
+        --model <path to local model checkpoint e.g. ./aurora-0.25-pretrained.ckpt> \
+        --data <path to local initial state data e.g. ./era5_subset.zarr, optional> \
+        --start_datetime <ISO 8601 format datetime e.g. 2026-01-01T00:00:00> \
+        --steps <number of inference steps to perform e.g. 10> \
+        --predictions <path to output NetCDF file of forecasts e.g. ./fcst.nc>
+
+Running in Azure Machine Learning:
+    See setup/components/inference/component.py for definition and deployment, and
+    notebooks/0_aurora_workshop.ipynb for example usage.
+"""
 
 import argparse
 from datetime import datetime
@@ -86,8 +104,7 @@ if __name__ == "__main__":
     LOG.info("Completed %d inference steps.", args.steps)
 
     LOG.info("Concatenating and writing predictions: path=%s", args.predictions)
-    # NOTE: original only wrote last prediction 2t to npy
-    # written to mounted blob store, how do we access data for exploration?
+    # NOTE: written to mounted blob store, how do we access data for exploration?
     preds_ds = xr.concat(datasets, dim="time")
     preds_ds.to_netcdf(args.predictions)
     LOG.info("Wrote predictions: path=%s", args.predictions)

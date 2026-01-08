@@ -1,4 +1,25 @@
-"""Aurora fine-tuning script."""
+"""Aurora fine-tuning script.
+
+This script takes a set of arguments through the command line to perform simple fine-
+tuning (updating all weights) of a pretrained Aurora model with local initial state date
+OR synthetic test data, a starting datetime, and the number of steps to perform. The
+loss history of all fine-tuning steps and the final forecast made with the fine-tuned
+model are written to specified output paths.
+
+Running locally:
+    python -m setup.components.training.main \
+        --model <path to local model checkpoint e.g. ./aurora-0.25-pretrained.ckpt> \
+        --data <path to local initial state data e.g. ./era5_subset.zarr, optional> \
+        --start_datetime <ISO 8601 format datetime e.g. 2026-01-01T00:00:00> \
+        --steps <number of fine-tuning steps to perform e.g. 10> \
+        --loss <path to output loss history NumPy file e.g. ./losses.npy> \
+        --prediction <path to output NetCDF of the final prediction e.g. ./fcst.nc>
+
+Running in Azure Machine Learning:
+    See setup/components/training/component.py for definition and deployment, and
+    notebooks/0_aurora_workshop.ipynb for example usage.
+
+"""
 
 import argparse
 from datetime import datetime, timedelta

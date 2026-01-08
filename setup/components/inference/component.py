@@ -1,4 +1,10 @@
-"""Aurora inference Azure ML Component definition."""
+"""Aurora inference Azure Machine Learning (AML) Component definition and deployment.
+
+Simply run this script to create or update the component in an AML workspace.
+By default, the workspace parameters (subscription_id, resource_group_name,
+workspace_name) are retrieved from temporary environment variables defined in ./.env -
+see ./.template.env for details on creating this file.
+"""
 
 from azure.ai.ml import Input, Output
 from azure.ai.ml.entities import CommandComponent
@@ -8,7 +14,7 @@ from setup.common.utils import create_mlclient
 if __name__ == "__main__":
     component = CommandComponent(
         name="workshop_aurora_inference",
-        description="Component for performing inference with Aurora.",
+        description="Component for performing Aurora inference.",
         version="1",
         command=(
             "python -m main "
@@ -18,7 +24,7 @@ if __name__ == "__main__":
             "--steps ${{inputs.steps}} "
             "--predictions ${{outputs.predictions}}"
         ),
-        code="./setup/components/inference/main.py",
+        code="./setup/components/inference/",
         # NOTE: environment does get persisted in registered component
         environment="aurora-inference:1",
         # NOTE: mode and path are stripped from inputs and outputs on registration
@@ -58,6 +64,7 @@ if __name__ == "__main__":
         },
         instance_count=1,
         is_deterministic=True,
+        # include common utils and constants for use in remote code
         additional_includes=["./setup/components/common/"],
     )
     mlc = create_mlclient(local=True)
