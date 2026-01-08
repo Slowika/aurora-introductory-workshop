@@ -1,4 +1,4 @@
-"""Aurora inference Azure ML Component logic."""
+"""Aurora inference script."""
 
 import argparse
 from datetime import datetime
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         "--data",
         type=str,
         required=False,
-        help="Path to the initial state data, if not a dry run.",
+        help="Path to the initial state data, if not a test run.",
     )
     parser.add_argument(
         "--start_datetime",
@@ -49,9 +49,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--steps",
-        type=int,
+        type=lambda x: max(int(x), 1),
         default=1,
-        help="Number of autoregressive steps to perform during inference, default 1.",
+        help="Number of inference steps to perform, default and minimum 1.",
     )
     parser.add_argument(
         "--predictions",
@@ -61,31 +61,35 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     LOG.info("Loading model: path=%s", args.model)
-    model = load_model(args.model)
+    model = load_model(args.model, train=False)
     LOG.info("Loaded model.")
 
     if args.data is None:
-        LOG.info("Generating low resolution dummy batch.")
-        batch = make_lowres_batch()
-        LOG.info("Generated low resolution dummy batch.")
+        LOG.info("No data argument provided, using synthetic test data.")
+        batch = make_lowres_batch(args.start_datetime)
+        LOG.info("Generated synthetic test batch.")
     else:
-        LOG.info("Loading data: path=%s, start=%s", args.data, args.start_datetime)
+        LOG.info("Data argument provided, using real data: path=%s", args.data)
         batch = load_batch_from_asset(args.data, args.start_datetime)
-        LOG.info("Loaded data.")
+        LOG.info("Loaded real data.")
 
     LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, args.steps)
     with torch.inference_mode():
         datasets = []
         for pred in rollout(model, batch, steps=args.steps):
             LOG.info(
-                "Predicted step: no=%s, timestamp=%s",
+                "Inference step complete: no=%s, timestamp=%s",
                 pred.metadata.rollout_step,
                 pred.metadata.time,
             )
             datasets.append(batch_to_xarray(pred))
-    LOG.info("Completed inference.")
+    LOG.info("Completed %d inference steps.", args.steps)
 
     LOG.info("Concatenating and writing predictions: path=%s", args.predictions)
+    # NOTE: original only wrote last prediction 2t to npy
+    # written to mounted blob store, how do we access data for exploration?
     preds_ds = xr.concat(datasets, dim="time")
-    preds_ds.to_zarr(args.predictions)
+    preds_ds.to_netcdf(args.predictions)
     LOG.info("Wrote predictions: path=%s", args.predictions)
+
+    LOG.info("Done!")

@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from datetime import datetime, timedelta, timezone  # UTC alias added py 3.11
+from datetime import datetime, timedelta
 
 import numpy as np
 import torch
@@ -29,13 +29,15 @@ def create_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-def load_model(model_path: str) -> AuroraPretrained:
+def load_model(model_path: str, *, train: bool) -> AuroraPretrained:
     """Load the Aurora model from a local checkpoint.
 
     Parameters
     ----------
     model_path : str
         Path to the local model checkpoint.
+    train : bool
+        Whether to set the model to training (True) or eval (False) mode.
 
     Returns
     -------
@@ -45,13 +47,23 @@ def load_model(model_path: str) -> AuroraPretrained:
     """
     model = AuroraPretrained()
     model.load_checkpoint_local(model_path)
-    model = model.to("cuda")
-    model.eval()
-    return model
+    return model.to("cuda").train(mode=train)
 
 
-def make_lowres_batch() -> Batch:
-    """Create a small 17x32 batch on the given device."""
+def make_lowres_batch(start_datetime: datetime) -> Batch:
+    """Create a small 17x32 batch on the given device.
+
+    Parameters
+    ----------
+    start_datetime : datetime.datetime
+        Start datetime for the batch.
+
+    Returns
+    -------
+    aurora.Batch
+        Generated low-resolution dummy Batch.
+
+    """
     return Batch(
         surf_vars={k: torch.randn(1, 2, 17, 32) for k in ("2t", "10u", "10v", "msl")},
         static_vars={k: torch.randn(17, 32) for k in ("lsm", "z", "slt")},
@@ -59,7 +71,7 @@ def make_lowres_batch() -> Batch:
         metadata=Metadata(
             lat=torch.linspace(90, -90, 17),
             lon=torch.linspace(0, 360, 32 + 1)[:-1],
-            time=(datetime(2020, 6, 1, 12, tzinfo=timezone.utc),),
+            time=(start_datetime,),
             atmos_levels=(100, 250, 500, 850),
         ),
     )

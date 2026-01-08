@@ -18,3 +18,4 @@ ATMOS_VAR_MAP = {
     "specific_humidity": "q",
     "geopotential": "z",
 }
+ATMOS_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
