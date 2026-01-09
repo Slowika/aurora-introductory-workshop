@@ -10,7 +10,8 @@ This will be run when any code below /setup/ is imported.
 import os
 from pathlib import Path
 
-env_path = Path(".env")
+root = Path(__file__).parent.parent  # ensures checking the project root
+env_path = root / ".env"
 if not env_path.exists():
     msg = "No .env file found in current directory."
     raise FileNotFoundError(msg)
