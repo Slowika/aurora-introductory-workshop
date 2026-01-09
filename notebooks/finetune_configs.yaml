@@ -1,0 +1,22 @@
+test_simple:
+  steps: 3
+  mode: test
+eval_simple:
+  steps: 5
+  mode: eval
+test_lora:
+  steps: 2
+  mode: test
+  use_lora: true
+eval_lora:
+  steps: 4
+  mode: eval
+  use_lora: true
+test_autoregressive:
+  steps: 10
+  mode: test
+  use_lora: true
+eval_autoregressive:
+  steps: 10
+  mode: eval
+  use_lora: true
