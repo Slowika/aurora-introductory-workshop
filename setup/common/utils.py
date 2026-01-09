@@ -3,6 +3,8 @@
 import os
 
 from azure.ai.ml import MLClient
+from azure.ai.ml.entities import Component, Data, Model
+from azure.ai.ml.operations import ComponentOperations, DataOperations, ModelOperations
 from azure.identity import DefaultAzureCredential
 
 
@@ -60,3 +62,27 @@ def create_mlclient(*, local: bool) -> MLClient:
     else:
         sub_id, rg_name, ws_name = get_aml_ci_env_vars()
     return MLClient(DefaultAzureCredential(), sub_id, rg_name, ws_name)
+
+
+def get_latest_asset(
+    operations: ComponentOperations | DataOperations | ModelOperations,
+    name: str,
+) -> Component | Data | Model:
+    """Return the latest version of a given asset.
+
+    Parameters
+    ----------
+    operations : azure.ai.ml.operations.ComponentOperations |
+        azure.ai.ml.operations.DataOperations | azure.ai.ml.operations.ModelOperations
+        Operations interface for the asset type.
+    name : str
+        Name of the asset.
+
+    Returns
+    -------
+    azure.ai.ml.entities.Component | azure.ai.ml.entities.Data |
+        azure.ai.ml.entities.Model
+        Latest version of the asset.
+
+    """
+    return next(iter(operations.list(name=name)))

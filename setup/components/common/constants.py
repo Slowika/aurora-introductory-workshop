@@ -9,7 +9,7 @@ SFC_VAR_MAP = {
 STATIC_VAR_MAP = {
     "land_sea_mask": "lsm",
     "soil_type": "slt",
-    "geopotential_height": "z",
+    "geopotential_at_surface": "z",
 }
 ATMOS_VAR_MAP = {
     "temperature": "t",

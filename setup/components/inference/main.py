@@ -45,6 +45,7 @@ except ImportError:
     )
 
 LOG = create_logger()
+# limit threads for writing Zarr to mounted storage
 dask_config.set(scheduler="threads", num_workers=10)
 
 if __name__ == "__main__":
@@ -57,7 +58,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data",
         type=str,
-        required=False,
         help="Path to the initial state data, if not a test run.",
     )
     parser.add_argument(
@@ -68,8 +68,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--steps",
         type=lambda x: max(int(x), 1),
-        default=1,
         help="Number of inference steps to perform, default and minimum 1.",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["eval", "test"],
+        help=(
+            "Whether to run in eval mode with real data or test mode with synthetic "
+            "data."
+        ),
     )
     parser.add_argument(
         "--predictions",
@@ -78,18 +86,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    if args.mode == "test":
+        LOG.info("Test mode enabled, using synthetic test data as initial state.")
+        batch = make_lowres_batch(args.start_datetime)
+    else:
+        LOG.info(
+            "Eval mode enabled, using real data as initial state: path=%s",
+            args.data,
+        )
+        batch = load_batch_from_asset(args.data, args.start_datetime)
+
     LOG.info("Loading model: path=%s", args.model)
     model = load_model(args.model, train=False)
-    LOG.info("Loaded model.")
-
-    if args.data is None:
-        LOG.info("No data argument provided, using synthetic test data.")
-        batch = make_lowres_batch(args.start_datetime)
-        LOG.info("Generated synthetic test batch.")
-    else:
-        LOG.info("Data argument provided, using real data: path=%s", args.data)
-        batch = load_batch_from_asset(args.data, args.start_datetime)
-        LOG.info("Loaded real data.")
 
     LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, args.steps)
     with torch.inference_mode():
@@ -98,15 +106,13 @@ if __name__ == "__main__":
             LOG.info(
                 "Inference step complete: no=%s, timestamp=%s",
                 pred.metadata.rollout_step,
-                pred.metadata.time,
+                pred.metadata.time[0].isoformat(timespec="hours"),
             )
             datasets.append(batch_to_xarray(pred))
     LOG.info("Completed %d inference steps.", args.steps)
 
     LOG.info("Concatenating and writing predictions: path=%s", args.predictions)
-    # NOTE: written to mounted blob store, how do we access data for exploration?
     preds_ds = xr.concat(datasets, dim="time")
     preds_ds.to_netcdf(args.predictions)
-    LOG.info("Wrote predictions: path=%s", args.predictions)
 
     LOG.info("Done!")

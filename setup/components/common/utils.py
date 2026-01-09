@@ -3,6 +3,7 @@
 import logging
 import sys
 from datetime import datetime, timedelta
+from typing import Any
 
 import numpy as np
 import torch
@@ -29,7 +30,13 @@ def create_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-def load_model(model_path: str, *, train: bool) -> AuroraPretrained:
+def load_model(  # NOTE: load Aurora pretrained
+    model_path: str,
+    *,
+    train: bool,
+    lora: bool,
+    **aurora_kwargs: dict[str, Any],
+) -> AuroraPretrained:
     """Load an Aurora model from a local checkpoint.
 
     Parameters
@@ -38,6 +45,10 @@ def load_model(model_path: str, *, train: bool) -> AuroraPretrained:
         Path to the local model checkpoint.
     train : bool
         Whether to set the model to training (True) or eval (False) mode.
+    lora : bool
+        Whether to use LoRA (Low-Rank Adaptation) during model loading.
+    aurora_kwargs : dict[str, Any]
+        Additional keyword arguments to pass to the AuroraPretrained constructor.
 
     Returns
     -------
@@ -45,7 +56,7 @@ def load_model(model_path: str, *, train: bool) -> AuroraPretrained:
         Loaded Aurora model.
 
     """
-    model = AuroraPretrained()
+    model = AuroraPretrained(use_lora=lora, **aurora_kwargs)
     model.load_checkpoint_local(model_path)
     return model.to("cuda").train(mode=train)
 
@@ -93,19 +104,24 @@ def load_batch_from_asset(data_path: str, start_datetime: datetime) -> Batch:
         Loaded Batch object.
 
     """
-    ds = xr.open_dataset(data_path, chunks={})
+    ds = xr.open_dataset(data_path, engine="zarr", chunks={})
     prev_datetime = start_datetime - timedelta(hours=6)
+    # select given datetime and that 6h prior
     ds_sel = ds.sel(time=[prev_datetime, start_datetime])
     return Batch(
+        # produces Tensors of shape [1, 2, lats, lons]
         surf_vars={
-            k: torch.from_numpy(ds_sel[v].values).unsqueeze(0)
+            v: torch.from_numpy(ds_sel[k].values).unsqueeze(0)
             for k, v in SFC_VAR_MAP.items()
         },
+        # produces Tensors of shape [lats, lons]
         static_vars={
-            k: torch.from_numpy(ds_sel[v].values) for k, v in STATIC_VAR_MAP.items()
+            v: torch.from_numpy(ds_sel[k].isel(time=-1).values)
+            for k, v in STATIC_VAR_MAP.items()
         },
+        # produces Tensors of shape [1, 2, levels, lats, lons]
         atmos_vars={
-            k: torch.from_numpy(ds_sel[v].values).unsqueeze(0)
+            v: torch.from_numpy(ds_sel[k].values).unsqueeze(0)
             for k, v in ATMOS_VAR_MAP.items()
         },
         metadata=Metadata(
@@ -132,21 +148,21 @@ def batch_to_xarray(batch: Batch) -> xr.Dataset:
 
     """
     surf_vars = {
-        k: (("time", "lat", "lon"), v.squeeze(0).numpy())
+        k: (("time", "lat", "lon"), v.squeeze(0).cpu().numpy())
         for k, v in batch.surf_vars.items()
     }
     static_vars = {
-        k: (("lat", "lon"), v.numpy()) for k, v in batch.static_vars.items()
+        k: (("lat", "lon"), v.cpu().numpy()) for k, v in batch.static_vars.items()
     }
     atmos_vars = {
-        f"{k}_atmos": (("time", "level", "lat", "lon"), v.squeeze(0).numpy())
+        f"{k}_atmos": (("time", "level", "lat", "lon"), v.squeeze(0).cpu().numpy())
         for k, v in batch.atmos_vars.items()
     }
     return xr.Dataset(
         data_vars=surf_vars | static_vars | atmos_vars,
         coords={
-            "lat": (("lat",), batch.metadata.lat.numpy()),
-            "lon": (("lon",), batch.metadata.lon.numpy()),
+            "lat": (("lat",), batch.metadata.lat.cpu().numpy()),
+            "lon": (("lon",), batch.metadata.lon.cpu().numpy()),
             "time": (("time",), [batch.metadata.time[0]]),
             "level": (("level",), np.array(batch.metadata.atmos_levels)),
         },
