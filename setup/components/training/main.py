@@ -94,10 +94,25 @@ if __name__ == "__main__":
         help="Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00.",
     )
     parser.add_argument(
+        "--type",
+        type=str,
+        choices=["simple", "lora", "autoregressive"],
+        help="Type of fine-tuning to perform.",
+    )
+    parser.add_argument(
         "--steps",
         type=lambda x: max(int(x), 1),
         default=1,
         help="Number of fine-tuning steps to perform, default and minimum 1.",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["eval", "test"],
+        help=(
+            "Whether to run in eval mode with real data or test mode with synthetic "
+            "data."
+        ),
     )
     parser.add_argument(
         "--loss",
@@ -111,20 +126,19 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    LOG.info("Loading model and optimiser: path=%s", args.model)
-    model = load_model(args.model, train=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    LOG.info("Loaded model and optimiser.")
-
-    if args.data is None:
-        LOG.info("No data argument provided, using synthetic test data.")
+    if args.mode == "test":
+        LOG.info("Test mode enabled, using synthetic test data.")
         batch_fn = make_lowres_batch
     else:
-        LOG.info("Data argument provided, using real data: path=%s.", args.data)
+        LOG.info("Test mode disabled, using real data: path=%s.", args.data)
         batch_fn = partial(
             load_batch_from_asset,
             data_path=args.data,
         )
+
+    LOG.info("Loading model and optimiser: path=%s", args.model)
+    model = load_model(args.model, train=True, lora=args.lora)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     LOG.info(
         "Starting fine-tuning: start=%s, steps=%d",
@@ -150,11 +164,8 @@ if __name__ == "__main__":
     LOG.info("Completed %d fine-tuning steps.", args.steps)
 
     LOG.info("Writing results: loss=%s, prediction=%s", args.loss, args.prediction)
-    # NOTE: original wrote loss to JSON and npy, then all last pred to npz and 2t to npy
-    # notebook only used loss npy, final 2t npy
     np.save(args.loss, np.array(loss_history, dtype=float))
     ds = batch_to_xarray(prediction)
     ds.to_netcdf(args.prediction)
-    LOG.info("Wrote results: loss=%s, prediction=%s", args.loss, args.prediction)
 
     LOG.info("Done!")

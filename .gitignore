@@ -208,3 +208,6 @@ __marimo__/
 
 # workshop outputs
 notebooks/outputs
+
+# misc scripts
+*.py

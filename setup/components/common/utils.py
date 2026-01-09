@@ -30,14 +30,14 @@ def create_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-def load_model(  # NOTE: load Aurora pretrained
+def load_model(
     model_path: str,
     *,
     train: bool,
     lora: bool,
     **aurora_kwargs: dict[str, Any],
 ) -> AuroraPretrained:
-    """Load an Aurora model from a local checkpoint.
+    """Load the Aurora pre-trained model from a local checkpoint.
 
     Parameters
     ----------
@@ -46,7 +46,7 @@ def load_model(  # NOTE: load Aurora pretrained
     train : bool
         Whether to set the model to training (True) or eval (False) mode.
     lora : bool
-        Whether to use LoRA (Low-Rank Adaptation) during model loading.
+        Whether to enable Low-Rank Adaptation (LoRA).
     aurora_kwargs : dict[str, Any]
         Additional keyword arguments to pass to the AuroraPretrained constructor.
 

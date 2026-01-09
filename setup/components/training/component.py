@@ -14,18 +14,23 @@ from setup.common.utils import create_mlclient
 if __name__ == "__main__":
     component = CommandComponent(
         name="aurora-finetuning",
-        description="Component for performing Aurora fine-tuning.",
+        description="Component for performing fine-tuning with Aurora.",
         version="1",
         command=(
             "python -m main "
             "--model ${{inputs.model}} "
             "--data ${{inputs.data}} "
             "--start_datetime ${{inputs.start_datetime}} "
+            "--type ${{inputs.type}} "
+            "--steps ${{inputs.steps}} "
+            "--mode ${{inputs.mode}} "
             "--loss ${{outputs.loss}} "
             "--prediction ${{outputs.prediction}}"
         ),
         code="./setup/components/training/",
-        environment="aurora-inference:1",
+        # environment gets persisted in registered component
+        environment="aurora-inference:2",
+        # mode and path are stripped from inputs and outputs on registration
         inputs={
             "model": Input(
                 type="custom_model",
@@ -33,11 +38,7 @@ if __name__ == "__main__":
             ),
             "data": Input(
                 type="uri_folder",
-                optional=True,
-                description=(
-                    "Data asset containing the fine-tuning data. Leave empty for a "
-                    "test run with synthetic data."
-                ),
+                description="Data asset containing the fine-tuning data.",
             ),
             "start_datetime": Input(
                 type="string",
@@ -45,12 +46,24 @@ if __name__ == "__main__":
                     "Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00."
                 ),
             ),
+            "type": Input(
+                type="string",
+                enum=["simple", "lora", "autoregressive"],
+                description="Type of fine-tuning to perform.",
+            ),
             "steps": Input(
                 type="integer",
-                default=1,
                 min=1,
                 max=10,
-                description="Number of autoregressive steps to perform.",
+                description="Number of fine-tuning steps to perform, min 1, max 10.",
+            ),
+            "mode": Input(
+                type="string",
+                enum=["eval", "test"],
+                description=(
+                    "Whether to run in eval mode with real data or test mode with "
+                    "synthetic data."
+                ),
             ),
         },
         outputs={
@@ -66,6 +79,7 @@ if __name__ == "__main__":
             ),
         },
         instance_count=1,
+        # whether to re-run the component when inputs are the same
         is_deterministic=True,
         # include common utils and constants for use in remote code
         additional_includes=["./setup/components/common/"],

@@ -97,7 +97,7 @@ if __name__ == "__main__":
         batch = load_batch_from_asset(args.data, args.start_datetime)
 
     LOG.info("Loading model: path=%s", args.model)
-    model = load_model(args.model, train=False)
+    model = load_model(args.model, train=False, lora=False)
 
     LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, args.steps)
     with torch.inference_mode():
