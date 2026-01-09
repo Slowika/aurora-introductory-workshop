@@ -7,7 +7,7 @@ This repository comprises resources for the Aurora fine-tuning on Azure Machine 
 ```md
 aurora_introductory_workshop/
 ├── notebooks/
-│   ├── 0_aurora_workshop.ipynb: core workshop Jupyter notebook for running jobs on AML.
+│   └── 0_aurora_workshop.ipynb: core workshop Jupyter notebook for running jobs on AML.
 ├── setup/: core Aurora logic and AML workspace setup resources
 │   ├── common/: AML workspace setup helper logic
 │   ├── components/
