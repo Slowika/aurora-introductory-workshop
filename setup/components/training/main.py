@@ -47,10 +47,10 @@ import json
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import partial
+from loss import loss
 
 import numpy as np
 import torch
-from aurora import Aurora, Batch
 
 # NOTE: enable imports in local and remote environments
 try:
@@ -71,296 +71,6 @@ except ImportError:
     )
 
 LOG = create_logger()
-
-
-def mae(pred: Batch, target: Batch) -> torch.Tensor:
-    """Calculate MAE over all dynamic variables in the prediction.
-
-    Parameters
-    ----------
-    pred : aurora.Batch
-        Model prediction.
-    target : aurora.Batch
-        Target batch.
-
-    Returns
-    -------
-    total : torch.Tensor
-        Scalar MAE loss tensor.
-
-    """
-    device = next(iter(pred.surf_vars.values())).device
-    total = torch.tensor(0.0, device=device)
-    for k in pred.surf_vars:
-        total = total + (pred.surf_vars[k] - target.surf_vars[k]).abs().mean()
-    for k in pred.atmos_vars:
-        total = total + (pred.atmos_vars[k] - target.atmos_vars[k]).abs().mean()
-    return total
-
-
-def get_lora_params(model: torch.nn.Module) -> list[torch.nn.Parameter]:
-    """Freeze all model parameters except LoRA adapters, returning the latter.
-
-    Parameters
-    ----------
-    model : torch.nn.Module
-        Model to freeze.
-
-    Returns
-    -------
-    params : list[torch.nn.Parameter]
-        List of trainable LoRA adapter parameters.
-
-    Raises
-    ------
-    RuntimeError
-        If no trainable parameters are found after freezing.
-
-    """
-    params = []
-    for name, p in model.named_parameters():
-        name_l = name.lower()
-        p.requires_grad = "lora" in name_l
-        if p.requires_grad:
-            params.append(p)
-
-    if not params:
-        msg = "No trainable parameters found after LoRA-freeze."
-        raise RuntimeError(msg)
-    return params
-
-
-def get_datetime_range(
-    start: datetime,
-    end: datetime,
-    step: timedelta = timedelta(hours=6),
-) -> list[datetime]:
-    """Generate a list of datetimes at regular intervals between start and end.
-
-    Parameters
-    ----------
-    start : datetime.datetime
-        Range start datetime.
-    end : datetime.datetime
-        Range end datetime.
-    step : datetime.timedelta, default = timedelta(hours=6)
-        Time interval between generated datetimes.
-
-    Returns
-    -------
-    list[datetime.datetime]
-        List of generated datetimes.
-
-    Raises
-    ------
-    ValueError
-        If less than two timestamps are generated, i.e. start is not at least one step
-        before end.
-
-    """
-    timestamps = [
-        start + step * i for i
-        in range(int((end - start).total_seconds() // step.total_seconds()) + 1)
-    ]
-    if len(timestamps) < 2:
-        msg = (
-            "Less than two timestamps generated, check start datetime is at least "
-            f"{step.total_seconds() / 3600} hours before end."
-        )
-        raise ValueError(msg)
-    return timestamps
-
-
-def finetune_short_lead(  # noqa: PLR0913
-    model: Aurora,
-    params: list[torch.nn.Parameter],
-    optimiser: torch.optim.Optimizer,
-    batch_fn: Callable[..., Batch],
-    timestamps: list[datetime],
-    epochs: int = 1,
-    **_: dict,
-) -> tuple[Batch, list[float]]:
-    """Fine-tune a pre-trained Aurora model with short lead training.
-
-    Parameters
-    ----------
-    model : aurora.Aurora
-        Aurora model to fine-tune.
-    params : list[torch.nn.Parameter]
-        Model parameters to fine-tune.
-    optimiser : torch.optim.Optimizer
-        Optimiser for fine-tuning.
-    batch_fn : collections.abc.Callable[..., aurora.Batch]
-        Callable returning a batch for fine-tuning.
-    timestamps : list[datetime.datetime]
-        List of datetimes for fine-tuning data.
-    epochs : int, default = 1
-        Number of fine-tuning epochs.
-
-    Returns
-    -------
-    pred : aurora.Batch
-        Model prediction after the final epoch.
-    loss_history : list[float]
-        List of loss value floats.
-
-    """
-    use_ts = timestamps[:len(timestamps) - 1]
-    _check_timestamps(use_ts, epochs)
-    loss_history: list[float] = []
-    step = timestamps[1] - timestamps[0]
-    rng = np.random.Generator(np.random.PCG64())
-
-    for epoch in range(epochs):
-        start_datetime = use_ts.pop(rng.integers(0, len(use_ts)))
-        init_batch = batch_fn(start_datetime=start_datetime)
-        tgt_batch = batch_fn(start_datetime=init_batch.metadata.time[0] + step, times=1)
-        optimiser.zero_grad(set_to_none=True)
-        pred = model.forward(init_batch)
-        loss_value = mae(pred, tgt_batch)
-        loss_value.backward()
-        torch.nn.utils.clip_grad_norm_(params, 1.0)
-        optimiser.step()
-        loss_history.append(float(loss_value.detach().cpu().item()))
-        _log_epoch(epoch, init_batch, pred, loss_history)
-
-    return pred, loss_history
-
-
-def finetune_autoregressive(  # noqa: PLR0913
-    model: Aurora,
-    params: list[torch.nn.Parameter],
-    optimiser: torch.optim.Optimizer,
-    batch_fn: Callable[..., Batch],
-    timestamps: list[datetime],
-    epochs: int = 1,
-    rollout_steps: int = 4,
-) -> tuple[Batch, list[float]]:
-    """Fine-tune an Aurora model with autoregressive training.
-
-    Loss calculation is performed on the final prediction to preserve memory relative to
-    cumulative loss.
-
-    Parameters
-    ----------
-    model : aurora.Aurora
-        Aurora model to fine-tune.
-    params : list[torch.nn.Parameter]
-        Model parameters to fine-tune.
-    optimiser : torch.optim.Optimizer
-        Optimiser for fine-tuning.
-    batch_fn : collections.abc.Callable[..., aurora.Batch]
-        Callable returning a batch for fine-tuning.
-    timestamps : list[datetime]
-        List of datetimes for fine-tuning data.
-    epochs : int, default = 1
-        Number of fine-tuning epochs.
-    rollout_steps : int, default = 4
-        Number of autoregressive rollout steps per epoch.
-
-    Returns
-    -------
-    pred : aurora.Batch
-        Model prediction after the final epoch.
-    loss_history : list[float]
-        List of loss value floats.
-
-    """
-    use_ts = timestamps[:len(timestamps) - rollout_steps]
-    _check_timestamps(use_ts, epochs)
-    loss_history: list[float] = []
-    step = timestamps[1] - timestamps[0]
-    rng = np.random.Generator(np.random.PCG64())
-
-    for epoch in range(epochs):
-        optimiser.zero_grad(set_to_none=True)
-        start_datetime = use_ts.pop(rng.integers(0, len(use_ts)))
-        init_batch = batch_fn(start_datetime=start_datetime)
-
-        with torch.no_grad():
-            for ro_step in range(rollout_steps - 1):
-                pred = model.forward(init_batch)
-                LOG.info(
-                    "Rollout step complete: no=%d, init_time=%s, pred_time=%s",
-                    ro_step,
-                    init_batch.metadata.time[0].isoformat(timespec="hours"),
-                    pred.metadata.time[0].isoformat(timespec="hours"),
-                )
-                init_batch = update_batch(init_batch, pred)
-
-        tgt_batch = batch_fn(
-            start_datetime=init_batch.metadata.time[0] + step,
-            times=1,
-        )
-        pred = model.forward(init_batch)
-        loss_value = mae(pred, tgt_batch)
-        loss_value.backward()
-        torch.nn.utils.clip_grad_norm_(params, 1.0)
-        optimiser.step()
-        loss_history.append(float(loss_value.detach().cpu().item()))
-        _log_epoch(epoch, init_batch, pred, loss_history)
-
-    return pred, loss_history
-
-
-def _check_timestamps(timestamps: list[datetime], epochs: int) -> None:
-    if epochs > len(timestamps):
-        msg = (
-            "Insufficient timestamps for epochs, reduce epochs or increase timestamp "
-            f"range: usable_timestamps={len(timestamps)}, epochs={epochs}"
-        )
-        raise ValueError(msg)
-
-
-def _log_epoch(
-    epoch: int,
-    init_batch: Batch,
-    pred: Batch,
-    loss_history: list[float],
-) -> None:
-    LOG.info(
-        "Fine-tune epoch complete: no=%d, init_time=%s, pred_time=%s, loss=%.4f",
-        epoch,
-        init_batch.metadata.time[0].isoformat(timespec="hours"),
-        pred.metadata.time[0].isoformat(timespec="hours"),
-        loss_history[-1],
-    )
-
-
-def update_batch(init_batch: Batch, pred: Batch) -> Batch:
-    """Update a batch with the latest prediction for autoregressive fine-tuning.
-
-    Parameters
-    ----------
-    init_batch : aurora.Batch
-        Input batch.
-    pred : aurora.Batch
-        Latest model prediction.
-
-    Returns
-    -------
-    aurora.Batch
-        Updated input batch for the next rollout step.
-
-    """
-    return dataclasses.replace(
-        pred,
-        surf_vars={
-            k: torch.cat([init_batch.surf_vars[k][:, 1:], v], dim=1)
-            for k, v in pred.surf_vars.items()
-        },
-        atmos_vars={
-            k: torch.cat([init_batch.atmos_vars[k][:, 1:], v], dim=1)
-            for k, v in pred.atmos_vars.items()
-        },
-    )
-
-
-# mapping of fine-tuning modes to functions
-FINETUNE_FNS: dict[str, Callable[..., tuple[Batch, list[float]]]] = {
-    "short": finetune_short_lead,
-    "rollout": finetune_autoregressive,
-}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -453,18 +163,27 @@ if __name__ == "__main__":
         args.end_datetime,
         epochs,
     )
-    timestamps = get_datetime_range(args.start_datetime, args.end_datetime)
-    prediction, loss_history = finetune_fn(
-        model=model,
-        params=params,
-        optimiser=optimiser,
-        batch_fn=batch_fn,
-        timestamps=timestamps,
-        epochs=epochs,
-        rollout_steps=args.config.get("rollout_steps", 4),
-    )
-    model = model.to("cpu")
-    LOG.info("Completed %d fine-tuning epochs.", epochs)
+    loss_history: list[float] = []
+    for step in range(args.steps):
+        # input for the model is the ERA5 data at start_datetime
+        inputs = batch_fn(start_datetime=args.start_datetime)
+        # target is the ERA5 data 6h in the future
+        target = batch_fn(start_datetime=args.start_datetime + timedelta(hours=6))
+        optimizer.zero_grad()
+        prediction = model.forward(inputs)
+        loss_value = loss(prediction, target)
+        loss_value.backward()
+        optimizer.step()
+        loss_history.append(float(loss_value.detach().cpu().item()))
+        LOG.info(
+            "Fine-tune step complete: no=%d, init_time=%s, pred_time=%s, loss=%.4f",
+            step,
+            inputs.metadata.time[0].isoformat(timespec="hours"),
+            prediction.metadata.time[0].isoformat(timespec="hours"),
+            loss_history[-1],
+        )
+    LOG.info("Completed %d fine-tuning steps.", args.steps)
+
     LOG.info("Writing results: loss=%s, prediction=%s", args.loss, args.prediction)
     np.save(args.loss, np.array(loss_history, dtype=float))
     ds = batch_to_xarray(prediction)
