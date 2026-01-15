@@ -90,7 +90,8 @@ if __name__ == "__main__":
         ax.coastlines()
         ax.gridlines(draw_labels=True)
         ax.imshow(diff_t, origin='lower', extent=extent, transform=ccrs.PlateCarree())
-        ax.set_title("Predicted vs ground-truth surface temperatures")
+        ax.set_title("Predicted vs ground-truth surface temperatures (%s; %d steps)",
+                     args.start_datetime, args.steps)
         mlflow.log_figure(fig, "temp_prediction_error_map.png")
 
     LOG.info("Done!")
