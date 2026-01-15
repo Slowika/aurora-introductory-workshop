@@ -59,7 +59,7 @@ def atmos_tensor(batch: Batch):
     atmos_dict = batch.atmos_vars
     return torch.stack([atmos_dict[id] for id in ATMOS_VARS])
 
-def loss(pred: Batch, target: Batch) -> torch.Tensor:
+def weighted_mae_loss(pred: Batch, target: Batch) -> torch.Tensor:
     """Area-weighted mean absolute error, following Bodnar et al. (2025)
 
     Parameters
@@ -93,3 +93,27 @@ def loss(pred: Batch, target: Batch) -> torch.Tensor:
              * ERA5FineTuningParams.ERA5_WEIGHT
              / (SURF_VARS_COUNT + ATMOS_VARS_COUNT))
     return total
+
+def rmse_loss(pred: Batch, target: Batch) -> torch.Tensor:
+    """Root mean square error computed between two batches,
+    summed equally across all variables.
+
+    Parameters
+    ----------
+    pred : aurora.Batch
+        Model prediction.
+    target : aurora.Batch
+        Ground truth.
+
+    Returns
+    -------
+    total : torch.Tensor
+        Scalar loss tensor.
+    """
+    surf_preds    = surf_pred_tensor(pred)
+    surf_targets  = surf_target_tensor(target)
+    atmos_preds   = atmos_tensor(pred)
+    atmos_targets = atmos_tensor(target)
+    surf_loss = torch.sqrt(torch.mean((surf_preds - surf_targets) ** 2))
+    atmos_loss = torch.sqrt(torch.mean((atmos_preds - atmos_targets) ** 2))
+    return surf_loss + atmos_loss

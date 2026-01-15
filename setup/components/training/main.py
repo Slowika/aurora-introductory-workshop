@@ -47,7 +47,6 @@ import json
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import partial
-from loss import loss
 
 import numpy as np
 import torch
@@ -61,6 +60,7 @@ try:
         register_new_variables,
         validate_common_config,
     )
+    from common.loss import weighted_mae_loss
 except ImportError:
     from setup.components.common.utils import (
         batch_to_xarray,
@@ -69,6 +69,7 @@ except ImportError:
         register_new_variables,
         validate_common_config,
     )
+    from setup.components.common.loss import weighted_mae_loss
 
 LOG = create_logger()
 
@@ -171,7 +172,7 @@ if __name__ == "__main__":
         target = batch_fn(start_datetime=args.start_datetime + timedelta(hours=6))
         optimizer.zero_grad()
         prediction = model.forward(inputs)
-        loss_value = loss(prediction, target)
+        loss_value = weighted_mae_loss(prediction, target)
         loss_value.backward()
         optimizer.step()
         loss_history.append(float(loss_value.detach().cpu().item()))
