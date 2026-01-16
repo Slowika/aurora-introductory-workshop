@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -10,7 +11,7 @@ import torch
 import xarray as xr
 from aurora import AuroraPretrained, Batch, Metadata
 
-from .constants import ATMOS_VAR_MAP, SFC_VAR_MAP, STATIC_VAR_MAP
+from setup.components.common.constants import ATMOS_VAR_MAP, SFC_VAR_MAP, STATIC_VAR_MAP
 
 
 def create_logger() -> logging.Logger:
@@ -30,24 +31,14 @@ def create_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-def load_model(
-    model_path: str,
-    *,
-    train: bool,
-    lora: bool,
-    **aurora_kwargs: dict[str, Any],
-) -> AuroraPretrained:
+def load_model(model_path: str, **finetune_cfg: dict[str, Any]) -> AuroraPretrained:
     """Load the Aurora pre-trained model from a local checkpoint.
 
     Parameters
     ----------
     model_path : str
         Path to the local model checkpoint.
-    train : bool
-        Whether to set the model to training (True) or eval (False) mode.
-    lora : bool
-        Whether to enable Low-Rank Adaptation (LoRA).
-    aurora_kwargs : dict[str, Any]
+    finetune_cfg : dict[str, Any]
         Additional keyword arguments to pass to the AuroraPretrained constructor.
 
     Returns
@@ -56,18 +47,40 @@ def load_model(
         Loaded Aurora model.
 
     """
-    model = AuroraPretrained(use_lora=lora, **aurora_kwargs)
-    model.load_checkpoint_local(model_path)
+    train = bool(finetune_cfg)
+    strict = bool(finetune_cfg.pop("strict", True))
+    model = AuroraPretrained(
+        use_lora=bool(finetune_cfg.pop("use_lora", False)),
+        **finetune_cfg,
+    )
+    model.load_checkpoint_local(model_path, strict)
+    if train and hasattr(model, "configure_activation_checkpointing"):
+        model.configure_activation_checkpointing()
     return model.to("cuda").train(mode=train)
 
 
-def make_lowres_batch(start_datetime: datetime) -> Batch:
+def make_lowres_batch(
+    start_datetime: datetime,
+    sfc_vars: dict[str, Any] = SFC_VAR_MAP,
+    static_vars: dict[str, Any] = STATIC_VAR_MAP,
+    atmos_vars: dict[str, Any] = ATMOS_VAR_MAP,
+    times: int = 2,
+    **_: dict,
+) -> Batch:
     """Create a small 17x32 batch on the given device.
 
     Parameters
     ----------
     start_datetime : datetime.datetime
         Start datetime for the batch.
+    sfc_vars : dict[str, Any], default = SFC_VAR_MAP
+        Surface variable mapping.
+    static_vars : dict[str, Any], default = STATIC_VAR_MAP
+        Static variable mapping.
+    atmos_vars : dict[str, Any], default = ATMOS_VAR_MAP
+        Atmospheric variable mapping.
+    times : int, default = 2
+        Number of time steps in the batch.
 
     Returns
     -------
@@ -76,9 +89,13 @@ def make_lowres_batch(start_datetime: datetime) -> Batch:
 
     """
     return Batch(
-        surf_vars={k: torch.randn(1, 2, 17, 32) for k in ("2t", "10u", "10v", "msl")},
-        static_vars={k: torch.randn(17, 32) for k in ("lsm", "z", "slt")},
-        atmos_vars={k: torch.randn(1, 2, 4, 17, 32) for k in ("z", "u", "v", "t", "q")},
+        surf_vars={
+            k: torch.randn(1, times, 17, 32) for k in sfc_vars.values()
+        },
+        static_vars={k: torch.randn(17, 32) for k in static_vars.values()},
+        atmos_vars={
+            k: torch.randn(1, times, 4, 17, 32) for k in atmos_vars.values()
+        },
         metadata=Metadata(
             lat=torch.linspace(90, -90, 17),
             lon=torch.linspace(0, 360, 32 + 1)[:-1],
@@ -88,7 +105,14 @@ def make_lowres_batch(start_datetime: datetime) -> Batch:
     )
 
 
-def load_batch_from_asset(data_path: str, start_datetime: datetime) -> Batch:
+def load_batch_from_asset(  # noqa: PLR0913
+    data_path: str,
+    start_datetime: datetime,
+    sfc_vars: dict[str, Any] = SFC_VAR_MAP,
+    static_vars: dict[str, Any] = STATIC_VAR_MAP,
+    atmos_vars: dict[str, Any] = ATMOS_VAR_MAP,
+    times: int = 2,
+) -> Batch:
     """Load a Batch from a local (mounted or downloaded) Azure ML data asset.
 
     Parameters
@@ -97,6 +121,14 @@ def load_batch_from_asset(data_path: str, start_datetime: datetime) -> Batch:
         Path to the data asset.
     start_datetime : datetime.datetime
         Start datetime for the batch.
+    sfc_vars : dict[str, Any], default = SFC_VAR_MAP
+        Surface variable mapping.
+    static_vars : dict[str, Any], default = STATIC_VAR_MAP
+        Static variable mapping.
+    atmos_vars : dict[str, Any], default = ATMOS_VAR_MAP
+        Atmospheric variable mapping.
+    times : int, default = 2
+        Number of time steps in the batch.
 
     Returns
     -------
@@ -105,24 +137,25 @@ def load_batch_from_asset(data_path: str, start_datetime: datetime) -> Batch:
 
     """
     ds = xr.open_dataset(data_path, engine="zarr", chunks={})
-    prev_datetime = start_datetime - timedelta(hours=6)
-    # select given datetime and that 6h prior
-    ds_sel = ds.sel(time=[prev_datetime, start_datetime])
+    time_indexer = [start_datetime]
+    for _ in range(1, times):
+        time_indexer.insert(0, time_indexer[0] - timedelta(hours=6))
+    ds_sel = ds.sel(time=time_indexer)
     return Batch(
-        # produces Tensors of shape [1, 2, lats, lons]
+        # produces Tensors of shape [1, times, lats, lons]
         surf_vars={
             v: torch.from_numpy(ds_sel[k].values).unsqueeze(0)
-            for k, v in SFC_VAR_MAP.items()
+            for k, v in sfc_vars.items()
         },
         # produces Tensors of shape [lats, lons]
         static_vars={
             v: torch.from_numpy(ds_sel[k].isel(time=-1).values)
-            for k, v in STATIC_VAR_MAP.items()
+            for k, v in static_vars.items()
         },
-        # produces Tensors of shape [1, 2, levels, lats, lons]
+        # produces Tensors of shape [1, times, levels, lats, lons]
         atmos_vars={
             v: torch.from_numpy(ds_sel[k].values).unsqueeze(0)
-            for k, v in ATMOS_VAR_MAP.items()
+            for k, v in atmos_vars.items()
         },
         metadata=Metadata(
             lat=torch.from_numpy(ds_sel["latitude"].values),
@@ -154,6 +187,7 @@ def batch_to_xarray(batch: Batch) -> xr.Dataset:
     static_vars = {
         k: (("lat", "lon"), v.cpu().numpy()) for k, v in batch.static_vars.items()
     }
+    # append _atmos to avoid name clashes / overwrites, solely for static and atmos "z"
     atmos_vars = {
         f"{k}_atmos": (("time", "level", "lat", "lon"), v.squeeze(0).cpu().numpy())
         for k, v in batch.atmos_vars.items()
@@ -167,3 +201,9 @@ def batch_to_xarray(batch: Batch) -> xr.Dataset:
             "level": (("level",), np.array(batch.metadata.atmos_levels)),
         },
     )
+
+
+BATCH_FNS: dict[str, Callable[..., Batch]] = {
+    "test": make_lowres_batch,
+    "eval": load_batch_from_asset,
+}

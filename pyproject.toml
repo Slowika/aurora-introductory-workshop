@@ -8,6 +8,7 @@ dependencies = [
     "adlfs>=2025.8.0",
     "azure-ai-ml>=1.31.0",
     "azure-identity>=1.25.1",
+    "azureml-mlflow>=1.60.0",
     "dask>=2025.12.0",
     "fsspec>=2025.12.0",
     "gcsfs>=2025.12.0",
@@ -15,6 +16,7 @@ dependencies = [
     "ipykernel>=7.1.0",
     "matplotlib>=3.10.8",
     "microsoft-aurora>=1.8.0",
+    "mlflow>=3.8.1",
     "xarray>=2025.12.0",
     "zarr>=3.1.5",
 ]

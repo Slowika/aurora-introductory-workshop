@@ -21,9 +21,7 @@ if __name__ == "__main__":
             "--model ${{inputs.model}} "
             "--data ${{inputs.data}} "
             "--start_datetime ${{inputs.start_datetime}} "
-            "--type ${{inputs.type}} "
-            "--steps ${{inputs.steps}} "
-            "--mode ${{inputs.mode}} "
+            "--config ${{inputs.config}} "
             "--loss ${{outputs.loss}} "
             "--prediction ${{outputs.prediction}}"
         ),
@@ -46,24 +44,9 @@ if __name__ == "__main__":
                     "Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00."
                 ),
             ),
-            "type": Input(
+            "config": Input(
                 type="string",
-                enum=["simple", "lora", "autoregressive"],
-                description="Type of fine-tuning to perform.",
-            ),
-            "steps": Input(
-                type="integer",
-                min=1,
-                max=10,
-                description="Number of fine-tuning steps to perform, min 1, max 10.",
-            ),
-            "mode": Input(
-                type="string",
-                enum=["eval", "test"],
-                description=(
-                    "Whether to run in eval mode with real data or test mode with "
-                    "synthetic data."
-                ),
+                description="JSON string of fine-tuning configuration.",
             ),
         },
         outputs={

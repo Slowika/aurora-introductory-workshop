@@ -8,9 +8,10 @@ are written to a NetCDF file at the specified output path.
 Running locally:
     python -m setup.components.inference.main \
         --model <path to local model checkpoint e.g. ./aurora-0.25-pretrained.ckpt> \
-        --data <path to local initial state data e.g. ./era5_subset.zarr, optional> \
+        --data <path to local initial state data e.g. ./era5_subset.zarr> \
         --start_datetime <ISO 8601 format datetime e.g. 2026-01-01T00:00:00> \
         --steps <number of inference steps to perform e.g. 10> \
+        --mode <inference mode: eval for real data or test for dummy data> \
         --predictions <path to output NetCDF file of forecasts e.g. ./fcst.nc>
 
 Running in Azure Machine Learning:
@@ -29,24 +30,22 @@ from dask import config as dask_config
 # NOTE: enable imports in local and remote environments
 try:
     from common.utils import (
+        BATCH_FNS,
         batch_to_xarray,
         create_logger,
-        load_batch_from_asset,
         load_model,
-        make_lowres_batch,
     )
 except ImportError:
     from setup.components.common.utils import (
+        BATCH_FNS,
         batch_to_xarray,
         create_logger,
-        load_batch_from_asset,
         load_model,
-        make_lowres_batch,
     )
 
-LOG = create_logger()
 # limit threads for writing Zarr to mounted storage
 dask_config.set(scheduler="threads", num_workers=10)
+LOG = create_logger()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aurora Inference Component")
@@ -58,7 +57,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data",
         type=str,
-        help="Path to the initial state data, if not a test run.",
+        help="Path to the training data, ignored if configured mode is test.",
     )
     parser.add_argument(
         "--start_datetime",
@@ -86,23 +85,25 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.mode == "test":
-        LOG.info("Test mode enabled, using synthetic test data as initial state.")
-        batch = make_lowres_batch(args.start_datetime)
-    else:
-        LOG.info(
-            "Eval mode enabled, using real data as initial state: path=%s",
-            args.data,
+    try:
+        init_batch = BATCH_FNS[args.mode](
+            data_path=args.data,
+            start_datetime=args.start_datetime,
         )
-        batch = load_batch_from_asset(args.data, args.start_datetime)
+    except KeyError as e:
+        msg = (
+            f"Missing 'mode' field or invalid value, must be one of {BATCH_FNS.keys()}."
+        )
+        raise KeyError(msg) from e
+    LOG.info("%s mode enabled.", args.mode)
 
     LOG.info("Loading model: path=%s", args.model)
-    model = load_model(args.model, train=False, lora=False)
+    model = load_model(args.model)
 
     LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, args.steps)
     with torch.inference_mode():
         datasets = []
-        for pred in rollout(model, batch, steps=args.steps):
+        for pred in rollout(model, init_batch, steps=args.steps):
             LOG.info(
                 "Inference step complete: no=%s, timestamp=%s",
                 pred.metadata.rollout_step,
