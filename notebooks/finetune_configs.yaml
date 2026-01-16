@@ -1,22 +1,87 @@
-test_simple:
-  steps: 3
+# lora_mode options ["single", "from_second", "all"]
+
+# settings for Aurora should be passed under the aurora_config key
+# see aurora.model.aurora.Aurora for all valid Aurora keyword arguments
+
+test_short_lead:
+  type: short
+  steps: 5
   mode: test
-eval_simple:
+  learning_rate: 3e-5
+  aurora_config:
+    autocast: true
+
+eval_short_lead:
+  type: short
   steps: 5
   mode: eval
-test_lora:
-  steps: 2
-  mode: test
-  use_lora: true
-eval_lora:
-  steps: 4
+  learning_rate: 3e-5
+  aurora_config:
+    autocast: true
+
+eval_short_lead_lora:
+  type: short
+  steps: 5
   mode: eval
-  use_lora: true
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+
 test_autoregressive:
+  type: autoregressive
   steps: 10
   mode: test
-  use_lora: true
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: false
+    autocast: true
+
 eval_autoregressive:
+  type: autoregressive
   steps: 10
   mode: eval
-  use_lora: true
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+
+test_add_variable:
+  type: short
+  steps: 5
+  mode: test
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+  extra_variables:
+    2m_dewpoint_temperature:
+      kind: surf
+      key: d2m
+      location: 0.0  # use real normalization stats if possible
+      scale: 1.0
+
+eval_add_variable:
+  type: short
+  steps: 5
+  mode: eval
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+  extra_variables:
+    2m_dewpoint_temperature:
+      kind: surf
+      key: d2m
+      location: 0.0
+      scale: 1.0
+
+# log mflow for all

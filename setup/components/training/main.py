@@ -33,10 +33,9 @@ import numpy as np
 import torch
 from aurora import Aurora, Batch, normalisation
 
-from setup.components.common.constants import ATMOS_VAR_MAP, SFC_VAR_MAP, STATIC_VAR_MAP
-
 # NOTE: enable imports in local and remote environments
 try:
+    from common.constants import ATMOS_VAR_MAP, SFC_VAR_MAP, STATIC_VAR_MAP
     from common.utils import (
         BATCH_FNS,
         batch_to_xarray,
@@ -44,6 +43,11 @@ try:
         load_model,
     )
 except ImportError:
+    from setup.components.common.constants import (
+        ATMOS_VAR_MAP,
+        SFC_VAR_MAP,
+        STATIC_VAR_MAP,
+    )
     from setup.components.common.utils import (
         BATCH_FNS,
         batch_to_xarray,
@@ -176,7 +180,7 @@ def finetune_short_lead(  # noqa: PLR0913
             times=1,
         )
         optimiser.zero_grad(set_to_none=True)
-        pred = model(init_batch)
+        pred = model.forward(init_batch)
         loss_value = supervised_mae(pred, tgt_batch)
         loss_value.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
@@ -305,6 +309,7 @@ def update_batch(init_batch: Batch, pred: Batch) -> Batch:
     )
 
 
+# mapping of fine-tuning modes to functions
 FINETUNE_FNS: dict[str, Callable[..., tuple[Batch, list[float]]]] = {
     "short": finetune_short_lead,
     "rollout": finetune_autoregressive,
@@ -366,7 +371,9 @@ if __name__ == "__main__":
         for longname, info in new_vars.items():
             register_new_variable(longname, info, var_map, cfg)
     cfg["strict"] = not (lora := cfg.get("use_lora", False)) and (new_vars is None)
+    LOG.info("Using Aurora config: %s", cfg)
     model = load_model(args.model, **cfg)
+    LOG.info("Variables to fine-tune: %s", var_map)
 
     try:
         mode = args.config["mode"]
@@ -400,8 +407,11 @@ if __name__ == "__main__":
 
     ft_steps = args.config.get("steps", 1)
     LOG.info("Starting fine-tuning: start=%s, steps=%d", args.start_datetime, ft_steps)
-    # TODO: mlflow logging
-    # stabilise level agg argument
+    # TODO:
+    # mlflow logging
+    # register fine-tuned model in AML
+    # re-work inference to allow new variables
+    # test autoregressive and new variable, LoRA
     prediction, loss_history = finetune_fn(
         model=model,
         params=params,
