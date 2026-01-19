@@ -1,14 +1,12 @@
 import torch
 
 from aurora import Batch
+from constants import SURF_VAR_RENAME
 
 SURF_VARS = ["2t", "10u", "10v", "msl"]
 SURF_VARS_COUNT = 4
 ATMOS_VARS = ["t", "u", "v", "q", "z"]
 ATMOS_VARS_COUNT = 5
-# Working around a quirk of the output prediction: keys in the output dictionary
-# are slightly different.
-SURF_VAR_RENAME = {"2t": "t2m", "10u": "u10", "10v" : "v10", "msl" : "msl"}
 
 class ERA5FineTuningParams:
     """"Fine-tuning parameters for ERA5 data.

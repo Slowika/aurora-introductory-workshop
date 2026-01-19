@@ -22,3 +22,7 @@ ATMOS_VAR_MAP = {
     "geopotential": "z",
 }
 ATMOS_LEVELS = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
+
+# Working around a quirk of the output prediction: keys in the output dictionary
+# are slightly different.
+SURF_VAR_RENAME = {"2t": "t2m", "10u": "u10", "10v" : "v10", "msl" : "msl"}
