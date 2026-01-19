@@ -31,12 +31,14 @@ try:
         load_batch_from_asset,
     )
     from common.loss import rmse_loss
+    from common.constants import SFC_VAR_MAP, SURF_VAR_RENAME
 except ImportError:
     from setup.components.common.utils import (
         create_logger,
         load_batch_from_asset,
     )
     from setup.components.common.loss import rmse_loss
+    from setup.components.common.constants import SFC_VAR_MAP, SURF_VAR_RENAME
 
 LOG = create_logger()
 if __name__ == "__main__":
@@ -73,25 +75,27 @@ if __name__ == "__main__":
             args.start_datetime + args.steps * timedelta(hours=6)
         )
 
-        # compute and log RMSE for the whole planet
-        rmse = rmse_loss(prediction, target).item()
-        LOG.info("RMSE for prediction: %.4f", rmse)
-        mlflow.log_artifact(rmse)
+        # iterate over all surface variables
+        for (desc, key_str) in SFC_VAR_MAP.items():
+            target_t = target.surf_vars[key_str]
+            prediction_t = prediction.surf_vars[SURF_VAR_RENAME[key_str]]
 
-        # display difference between prediction and target surface temperature
-        target_t = target.surf_vars["2t"]
-        prediction_t = prediction.surf_vars["t2m"]
-        diff_t = prediction_t - target_t
+            # compute and log RMSE for the whole planet
+            rmse = rmse_loss(prediction_t, target_t).item()
+            LOG.info("RMSE for prediction: %.4f", rmse)
+            mlflow.log_metric(f"{desc} (RMSE)", rmse)
 
-        fig = plt.figure(figsize=(40, 50))
-        ax = plt.axes(projection=ccrs.PlateCarree())
-        extent = [-180, 180, -90, 90]
-        ax.set_extent(extent=extent)
-        ax.coastlines()
-        ax.gridlines(draw_labels=True)
-        ax.imshow(diff_t, origin='lower', extent=extent, transform=ccrs.PlateCarree())
-        ax.set_title("Predicted vs ground-truth surface temperatures (%s; %d steps)",
-                     args.start_datetime, args.steps)
-        mlflow.log_figure(fig, "temp_prediction_error_map.png")
+            # display difference between prediction and target surface temperature
+            diff_t = prediction_t - target_t
+            fig = plt.figure(figsize=(40, 50))
+            ax = plt.axes(projection=ccrs.PlateCarree())
+            extent = [-180, 180, -90, 90]
+            ax.set_extent(extent=extent)
+            ax.coastlines()
+            ax.gridlines(draw_labels=True)
+            ax.imshow(diff_t, origin='lower', extent=extent, transform=ccrs.PlateCarree())
+            ax.set_title(f"Predicted vs ground-truth {desc} "
+                         f"({args.start_datetime}; {args.steps} steps)")
+            mlflow.log_figure(fig, "temp_prediction_error_map.png")
 
     LOG.info("Done!")

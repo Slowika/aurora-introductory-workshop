@@ -92,26 +92,20 @@ def weighted_mae_loss(pred: Batch, target: Batch) -> torch.Tensor:
              / (SURF_VARS_COUNT + ATMOS_VARS_COUNT))
     return total
 
-def rmse_loss(pred: Batch, target: Batch) -> torch.Tensor:
-    """Root mean square error computed between two batches,
+def rmse_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Root mean square error computed between two tensors,
     summed equally across all variables.
 
     Parameters
     ----------
-    pred : aurora.Batch
-        Model prediction.
-    target : aurora.Batch
-        Ground truth.
+    pred : torch.Tensor
+        Single quantity (e.g. surface temperature) drawn from model output.
+    target : torch.Tensor
+        Single quantity (e.g. surface temperature), ground truth.
 
     Returns
     -------
     total : torch.Tensor
         Scalar loss tensor.
     """
-    surf_preds    = surf_pred_tensor(pred)
-    surf_targets  = surf_target_tensor(target)
-    atmos_preds   = atmos_tensor(pred)
-    atmos_targets = atmos_tensor(target)
-    surf_loss = torch.sqrt(torch.mean((surf_preds - surf_targets) ** 2))
-    atmos_loss = torch.sqrt(torch.mean((atmos_preds - atmos_targets) ** 2))
-    return surf_loss + atmos_loss
+    return torch.sqrt(torch.mean((pred - target) ** 2))

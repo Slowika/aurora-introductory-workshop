@@ -8,7 +8,7 @@ workspace_name) are retrieved from temporary environment variables defined in ./
 see ./.template.env for details on creating this file.
 """
 
-from azure.ai.ml import Input, Output
+from azure.ai.ml import Input
 from azure.ai.ml.entities import CommandComponent
 
 from setup.common.utils import create_mlclient
