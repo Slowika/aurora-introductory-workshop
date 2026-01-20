@@ -61,8 +61,9 @@ def load_model(
         Loaded Aurora model.
 
     """
+    strict = bool(cfg.pop("strict", True))
     model = AuroraPretrained(use_lora=bool(cfg.pop("use_lora", False)), **cfg)
-    model.load_checkpoint_local(model_path, strict=bool(cfg.pop("strict", True)))
+    model.load_checkpoint_local(model_path, strict)
     if train and hasattr(model, "configure_activation_checkpointing"):
         model.configure_activation_checkpointing()
     return model.to("cuda").train(mode=train)
@@ -301,7 +302,7 @@ def register_new_variables(
             msg = f"Unknown variable kind, must be one of {list(var_map.keys())}."
             raise KeyError(msg) from e
         type_var_map[longname] = info["key"]
-        var_cfg[f"{info['kind']}_vars"] = tuple(type_var_map.values())
+        var_cfg[info["kind"]] = tuple(type_var_map.values())
         normalisation.locations[info["key"]] = info.get("location", 0.0)
         normalisation.scales[info["key"]] = info.get("scale", 1.0)
     return var_map, var_cfg

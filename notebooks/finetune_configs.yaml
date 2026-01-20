@@ -1,28 +1,26 @@
-# lora_mode options ["single", "from_second", "all"]
-
 # settings for Aurora should be passed under the aurora_config key
 # see aurora.model.aurora.Aurora for all valid Aurora keyword arguments
 
 test_short_lead:
   type: short
-  steps: 5
   mode: test
+  steps: 5
   learning_rate: 3e-5
   aurora_config:
     autocast: true
 
 eval_short_lead:
   type: short
-  steps: 5
   mode: eval
+  steps: 5
   learning_rate: 3e-5
   aurora_config:
     autocast: true
 
 eval_short_lead_lora:
   type: short
-  steps: 5
   mode: eval
+  steps: 5
   learning_rate: 3e-5
   aurora_config:
     use_lora: true
@@ -31,18 +29,20 @@ eval_short_lead_lora:
     autocast: true
 
 test_autoregressive:
-  type: autoregressive
-  steps: 10
+  type: rollout
   mode: test
+  steps: 5
+  rollout_steps: 4
   learning_rate: 3e-5
   aurora_config:
     use_lora: false
     autocast: true
 
 eval_autoregressive:
-  type: autoregressive
-  steps: 10
+  type: rollout
   mode: eval
+  steps: 5
+  rollout_steps: 4
   learning_rate: 3e-5
   aurora_config:
     use_lora: true
@@ -52,8 +52,8 @@ eval_autoregressive:
 
 test_add_variable:
   type: short
-  steps: 5
   mode: test
+  steps: 5
   learning_rate: 3e-5
   aurora_config:
     use_lora: true
@@ -62,9 +62,9 @@ test_add_variable:
     autocast: true
   extra_variables:
     2m_dewpoint_temperature:
-      kind: surf
+      kind: surf_vars
       key: d2m
-      location: 0.0  # use real normalization stats if possible
+      location: 0.0  # use real normalisation stats if possible
       scale: 1.0
 
 eval_add_variable:
@@ -79,7 +79,7 @@ eval_add_variable:
     autocast: true
   extra_variables:
     2m_dewpoint_temperature:
-      kind: surf
+      kind: surf_vars
       key: d2m
       location: 0.0
       scale: 1.0

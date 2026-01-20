@@ -18,14 +18,14 @@ if __name__ == "__main__":
         name="workshop_aurora_inference",
         display_name="Aurora Inference",
         description="Component for performing inference with Aurora.",
-        version="1",
+        version="2",
         command=(
             "python -m main "
             "--model ${{inputs.model}} "
             "--data ${{inputs.data}} "
             "--start_datetime ${{inputs.start_datetime}} "
-            "--steps ${{inputs.steps}} "
-            "--mode ${{inputs.mode}} "
+            # config arg wrapped in single quotes to handle JSON format
+            "--config '${{inputs.config}}' "
             "--predictions ${{outputs.predictions}}"
         ),
         code="./setup/components/inference/",
@@ -48,19 +48,9 @@ if __name__ == "__main__":
                     "2026-01-01T00:00:00."
                 ),
             ),
-            "steps": Input(
-                type="integer",
-                min=1,
-                max=10,
-                description="Number of autoregressive steps to perform, min 1, max 10.",
-            ),
-            "mode": Input(
+            "config": Input(
                 type="string",
-                enum=["eval", "test"],
-                description=(
-                    "Whether to run in eval mode with real data or test mode with "
-                    "synthetic data."
-                ),
+                description="JSON string of inference configuration.",
             ),
         },
         outputs={

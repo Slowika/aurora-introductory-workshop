@@ -1,10 +1,9 @@
 """Aurora fine-tuning script.
 
 This script takes a set of arguments through the command line to perform simple fine-
-tuning (updating all weights) of a pretrained Aurora model with local initial state date
-OR synthetic test data, a starting datetime, and the number of steps to perform. The
-loss history of all fine-tuning steps and the final forecast made with the fine-tuned
-model are written to specified output paths.
+tuning (updating all weights) of a pretrained Aurora model. The loss history of all
+fine-tuning steps and the final forecast made with the fine-tuned model are written to
+specified output paths.
 
 Running locally:
     python -m setup.components.training.main \
@@ -200,14 +199,12 @@ def finetune_autoregressive(  # noqa: PLR0913
                 )
                 pred = model.forward(rollout_batch)
                 LOG.info(
-                    "Rollout step: no=%d, init_time=%s, pred_time=%s, loss=%.4f",
+                    "Rollout step complete: no=%d, init_time=%s, pred_time=%s",
                     ro_step,
                     rollout_batch.metadata.time[0].isoformat(timespec="hours"),
                     pred.metadata.time[0].isoformat(timespec="hours"),
-                    loss_history[-1],
                 )
                 rollout_batch = update_batch(rollout_batch, pred)
-                # NOTE: not even checking loss here?
 
         pred = model.forward(rollout_batch)
         loss_value = supervised_mae(pred, tgt_batch)
@@ -302,6 +299,11 @@ if __name__ == "__main__":
         type=str,
         help="Path to which the final prediction will be written.",
     )
+    parser.add_argument(
+        "--finetuned",
+        type=str,
+        help="Path to which the fine-tuned model state will be written.",
+    )
     args = parser.parse_args()
 
     try:
@@ -329,7 +331,7 @@ if __name__ == "__main__":
     LOG.info("%s data mode enabled.", args.config["mode"])
 
     LOG.info("Loading model parameters and optimiser.")
-    if lora is True:
+    if lora:
         LOG.info("LoRA enabled, freezing all model parameters except LoRA adapters.")
         freeze_to_lora(model)
         params = [p for p in model.parameters() if p.requires_grad]
@@ -342,10 +344,7 @@ if __name__ == "__main__":
     )
 
     LOG.info("Starting fine-tuning: start=%s, steps=%d", args.start_datetime, ft_steps)
-    # TODO:
-    # mlflow logging, add libs to dockerfile
-    # register fine-tuned model in AML, write as comp output
-    # test autoregressive and new variable, LoRA
+    # TODO: mlflow logging, add libs to dockerfile
     prediction, loss_history = finetune_fn(
         model=model,
         params=params,
@@ -355,11 +354,19 @@ if __name__ == "__main__":
         steps=ft_steps,
         rollout_steps=args.config.get("rollout_steps", 4),
     )
+    model = model.to("cpu")
     LOG.info("Completed %d fine-tuning steps.", ft_steps)
 
     LOG.info("Writing results: loss=%s, prediction=%s", args.loss, args.prediction)
     np.save(args.loss, np.array(loss_history, dtype=float))
     ds = batch_to_xarray(prediction)
     ds.to_netcdf(args.prediction)
+
+    LOG.info("Writing model: path=%s", args.finetuned)
+    state = model.state_dict()
+    if lora:
+        LOG.info("Saving LoRA weights only.")
+        state = {k: v for k, v in state.items() if "lora" in k.lower()}
+    torch.save(state, args.finetuned)
 
     LOG.info("Done!")

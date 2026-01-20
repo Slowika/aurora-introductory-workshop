@@ -1,9 +1,8 @@
 """Aurora inference script.
 
 This script takes a set of arguments through the command line to perform autoregressive
-forecasting using a pretrained Aurora model, local initial state date OR synthetic test
-data, a starting datetime, and the number of steps to perform. All generated forecasts
-are written to a NetCDF file at the specified output path.
+forecasting using a pretrained Aurora model. All generated forecasts are written to a
+NetCDF file at the specified output path.
 
 Running locally:
     python -m setup.components.inference.main \
