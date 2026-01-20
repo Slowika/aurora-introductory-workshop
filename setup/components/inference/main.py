@@ -10,8 +10,7 @@ Running locally:
         --model <path to local model checkpoint e.g. ./aurora-0.25-pretrained.ckpt> \
         --data <path to local initial state data e.g. ./era5_subset.zarr> \
         --start_datetime <ISO 8601 format datetime e.g. 2026-01-01T00:00:00> \
-        --steps <number of inference steps to perform e.g. 10> \
-        --mode <inference mode: eval for real data or test for dummy data> \
+        --config <JSON-formatted string of inference configuration> \
         --predictions <path to output NetCDF file of forecasts e.g. ./fcst.nc>
 
 Running in Azure Machine Learning:
@@ -20,31 +19,31 @@ Running in Azure Machine Learning:
 """
 
 import argparse
+import json
 from datetime import datetime
 
 import torch
 import xarray as xr
 from aurora import rollout
-from dask import config as dask_config
 
 # NOTE: enable imports in local and remote environments
 try:
     from common.utils import (
-        BATCH_FNS,
         batch_to_xarray,
         create_logger,
         load_model,
+        register_new_variables,
+        validate_common_config,
     )
 except ImportError:
     from setup.components.common.utils import (
-        BATCH_FNS,
         batch_to_xarray,
         create_logger,
         load_model,
+        register_new_variables,
+        validate_common_config,
     )
 
-# limit threads for writing Zarr to mounted storage
-dask_config.set(scheduler="threads", num_workers=10)
 LOG = create_logger()
 
 if __name__ == "__main__":
@@ -65,18 +64,9 @@ if __name__ == "__main__":
         help="Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00.",
     )
     parser.add_argument(
-        "--steps",
-        type=lambda x: max(int(x), 1),
-        help="Number of inference steps to perform, default and minimum 1.",
-    )
-    parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["eval", "test"],
-        help=(
-            "Whether to run in eval mode with real data or test mode with synthetic "
-            "data."
-        ),
+        "--config",
+        type=json.loads,
+        help="JSON string of inference configuration.",
     )
     parser.add_argument(
         "--predictions",
@@ -85,32 +75,30 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    try:
-        init_batch = BATCH_FNS[args.mode](
-            data_path=args.data,
-            start_datetime=args.start_datetime,
-        )
-    except KeyError as e:
-        msg = (
-            f"Missing 'mode' field or invalid value, must be one of {BATCH_FNS.keys()}."
-        )
-        raise KeyError(msg) from e
-    LOG.info("%s mode enabled.", args.mode)
+    batch_fn, inf_steps = validate_common_config(args.config)
+    var_map, var_cfg = register_new_variables(args.config.get("extra_variables", {}))
+    init_batch = batch_fn(
+        data_path=args.data,
+        start_datetime=args.start_datetime,
+        **var_map,
+    )
+    LOG.info("%s mode enabled.", args.config["mode"])
 
     LOG.info("Loading model: path=%s", args.model)
-    model = load_model(args.model)
+    model = load_model(args.model, train=False, **var_cfg)
+    LOG.info("Loaded model using config: %s", var_cfg)
 
-    LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, args.steps)
+    LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, inf_steps)
     with torch.inference_mode():
         datasets = []
-        for pred in rollout(model, init_batch, steps=args.steps):
+        for pred in rollout(model, init_batch, steps=inf_steps):
             LOG.info(
                 "Inference step complete: no=%s, timestamp=%s",
                 pred.metadata.rollout_step,
                 pred.metadata.time[0].isoformat(timespec="hours"),
             )
             datasets.append(batch_to_xarray(pred))
-    LOG.info("Completed %d inference steps.", args.steps)
+    LOG.info("Completed %d inference steps.", inf_steps)
 
     LOG.info("Concatenating and writing predictions: path=%s", args.predictions)
     preds_ds = xr.concat(datasets, dim="time")

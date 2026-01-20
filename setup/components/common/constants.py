@@ -1,6 +1,6 @@
 """Common utility constants."""
 
-SFC_VAR_MAP = {
+SURF_VAR_MAP = {
     "10m_u_component_of_wind": "10u",
     "10m_v_component_of_wind": "10v",
     "2m_temperature": "2t",

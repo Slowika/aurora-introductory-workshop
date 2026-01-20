@@ -27,32 +27,27 @@ import json
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import partial
-from typing import Any
 
 import numpy as np
 import torch
-from aurora import Aurora, Batch, normalisation
+from aurora import Aurora, Batch
 
 # NOTE: enable imports in local and remote environments
 try:
-    from common.constants import ATMOS_VAR_MAP, SFC_VAR_MAP, STATIC_VAR_MAP
     from common.utils import (
-        BATCH_FNS,
         batch_to_xarray,
         create_logger,
         load_model,
+        register_new_variables,
+        validate_common_config,
     )
 except ImportError:
-    from setup.components.common.constants import (
-        ATMOS_VAR_MAP,
-        SFC_VAR_MAP,
-        STATIC_VAR_MAP,
-    )
     from setup.components.common.utils import (
-        BATCH_FNS,
         batch_to_xarray,
         create_logger,
         load_model,
+        register_new_variables,
+        validate_common_config,
     )
 
 LOG = create_logger()
@@ -95,46 +90,6 @@ def freeze_to_lora(model: torch.nn.Module) -> None:
     for name, p in model.named_parameters():
         name_l = name.lower()
         p.requires_grad = "lora" in name_l
-
-
-def register_new_variable(
-    name: str,
-    info: dict[str, Any],
-    var_map: dict[str, dict[str, str]],
-    cfg: dict[str, Any],
-) -> None:
-    """Register a new variable to be added to the model and data.
-
-    Parameters
-    ----------
-    name : str
-        Long name of the new variable.
-    info : dict[str, Any]
-        Information about the new variable. Must include keys:
-        - "kind": one of "surf", "static", or "atmos"
-        - "key": variable shortname
-        - "location": normalisation location statistic
-        - "scale": normalisation scale statistic
-    var_map : dict[str, dict[str, str]]
-        Mapping of variable kinds to Aurora keys.
-    cfg : dict[str, Any]
-        Aurora model configuration dictionary to update.
-
-    Raises
-    ------
-    KeyError
-        If info["kind"] is not supported, currently "surf", "static", or "atmos".
-
-    """
-    try:
-        type_var_map = var_map[info["kind"]]
-    except KeyError as e:
-        msg = f"Unknown variable kind, must be one of {list(var_map.keys())}."
-        raise KeyError(msg) from e
-    type_var_map[name] = info["key"]
-    cfg[f"{info['kind']}_vars"] = tuple(type_var_map.values())
-    normalisation.locations[info["key"]] = info["location"]
-    normalisation.scales[info["key"]] = info["scale"]
 
 
 def finetune_short_lead(  # noqa: PLR0913
@@ -361,36 +316,17 @@ if __name__ == "__main__":
     LOG.info("%s training enabled.", ft_type)
 
     LOG.info("Loading model: path=%s", args.model)
-    cfg = args.config["aurora_config"]
-    var_map = {
-        "surf": SFC_VAR_MAP.copy(),
-        "static": STATIC_VAR_MAP.copy(),
-        "atmos": ATMOS_VAR_MAP.copy(),
-    }
-    if (new_vars := args.config.get("extra_variables")) is not None:
-        for longname, info in new_vars.items():
-            register_new_variable(longname, info, var_map, cfg)
-    cfg["strict"] = not (lora := cfg.get("use_lora", False)) and (new_vars is None)
-    LOG.info("Using Aurora config: %s", cfg)
-    model = load_model(args.model, **cfg)
+    new_vars = args.config.get("extra_variables")
+    var_map, var_cfg = register_new_variables(new_vars or {})
     LOG.info("Variables to fine-tune: %s", var_map)
+    cfg = args.config["aurora_config"] | var_cfg
+    cfg["strict"] = not (lora := cfg.get("use_lora", False)) and (new_vars is None)
+    model = load_model(args.model, train=True, **cfg)
+    LOG.info("Loaded model using config: %s", cfg)
 
-    try:
-        mode = args.config["mode"]
-        batch_fn = partial(
-            BATCH_FNS[mode],
-            data_path=args.data,
-            surf_vars=var_map["surf"],
-            static_vars=var_map["static"],
-            atmos_vars=var_map["atmos"],
-        )
-    except KeyError as e:
-        msg = (
-            "Missing 'mode' field or invalid value, must be one of "
-            f"{list(BATCH_FNS.keys())}."
-        )
-        raise KeyError(msg) from e
-    LOG.info("%s data mode enabled.", mode)
+    batch_fn, ft_steps = validate_common_config(args.config)
+    batch_fn = partial(batch_fn, data_path=args.data, **var_map)
+    LOG.info("%s data mode enabled.", args.config["mode"])
 
     LOG.info("Loading model parameters and optimiser.")
     if lora is True:
@@ -405,12 +341,10 @@ if __name__ == "__main__":
         lr=float(args.config.get("learning_rate", 3e-5)),
     )
 
-    ft_steps = args.config.get("steps", 1)
     LOG.info("Starting fine-tuning: start=%s, steps=%d", args.start_datetime, ft_steps)
     # TODO:
-    # mlflow logging
-    # register fine-tuned model in AML
-    # re-work inference to allow new variables
+    # mlflow logging, add libs to dockerfile
+    # register fine-tuned model in AML, write as comp output
     # test autoregressive and new variable, LoRA
     prediction, loss_history = finetune_fn(
         model=model,

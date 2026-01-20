@@ -9,15 +9,15 @@ from typing import Any
 import numpy as np
 import torch
 import xarray as xr
-from aurora import AuroraPretrained, Batch, Metadata
+from aurora import AuroraPretrained, Batch, Metadata, normalisation
 
 try:
-    from common.constants import ATMOS_VAR_MAP, SFC_VAR_MAP, STATIC_VAR_MAP
+    from common.constants import ATMOS_VAR_MAP, STATIC_VAR_MAP, SURF_VAR_MAP
 except ImportError:
     from setup.components.common.constants import (
         ATMOS_VAR_MAP,
-        SFC_VAR_MAP,
         STATIC_VAR_MAP,
+        SURF_VAR_MAP,
     )
 
 
@@ -38,14 +38,21 @@ def create_logger() -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-def load_model(model_path: str, **finetune_cfg: dict[str, Any]) -> AuroraPretrained:
+def load_model(
+    model_path: str,
+    *,
+    train: bool,
+    **cfg: dict[str, Any],
+) -> AuroraPretrained:
     """Load the Aurora pre-trained model from a local checkpoint.
 
     Parameters
     ----------
     model_path : str
         Path to the local model checkpoint.
-    finetune_cfg : dict[str, Any]
+    train : bool
+        Whether to set the model to training mode.
+    cfg : dict[str, Any]
         Additional keyword arguments to pass to the AuroraPretrained constructor.
 
     Returns
@@ -54,13 +61,8 @@ def load_model(model_path: str, **finetune_cfg: dict[str, Any]) -> AuroraPretrai
         Loaded Aurora model.
 
     """
-    strict = bool(finetune_cfg.pop("strict", True))
-    model = AuroraPretrained(
-        use_lora=bool(finetune_cfg.pop("use_lora", False)),
-        **finetune_cfg,
-    )
-    model.load_checkpoint_local(model_path, strict)
-    train = bool(finetune_cfg)
+    model = AuroraPretrained(use_lora=bool(cfg.pop("use_lora", False)), **cfg)
+    model.load_checkpoint_local(model_path, strict=bool(cfg.pop("strict", True)))
     if train and hasattr(model, "configure_activation_checkpointing"):
         model.configure_activation_checkpointing()
     return model.to("cuda").train(mode=train)
@@ -68,7 +70,7 @@ def load_model(model_path: str, **finetune_cfg: dict[str, Any]) -> AuroraPretrai
 
 def make_lowres_batch(
     start_datetime: datetime,
-    surf_vars: dict[str, Any] = SFC_VAR_MAP,
+    surf_vars: dict[str, Any] = SURF_VAR_MAP,
     static_vars: dict[str, Any] = STATIC_VAR_MAP,
     atmos_vars: dict[str, Any] = ATMOS_VAR_MAP,
     times: int = 2,
@@ -80,7 +82,7 @@ def make_lowres_batch(
     ----------
     start_datetime : datetime.datetime
         Start datetime for the batch.
-    surf_vars : dict[str, Any], default = SFC_VAR_MAP
+    surf_vars : dict[str, Any], default = SURF_VAR_MAP
         Surface variable mapping.
     static_vars : dict[str, Any], default = STATIC_VAR_MAP
         Static variable mapping.
@@ -118,7 +120,7 @@ def make_lowres_batch(
 def load_batch_from_asset(  # noqa: PLR0913
     data_path: str,
     start_datetime: datetime,
-    surf_vars: dict[str, Any] = SFC_VAR_MAP,
+    surf_vars: dict[str, Any] = SURF_VAR_MAP,
     static_vars: dict[str, Any] = STATIC_VAR_MAP,
     atmos_vars: dict[str, Any] = ATMOS_VAR_MAP,
     times: int = 2,
@@ -131,7 +133,7 @@ def load_batch_from_asset(  # noqa: PLR0913
         Path to the data asset.
     start_datetime : datetime.datetime
         Start datetime for the batch.
-    surf_vars : dict[str, Any], default = SFC_VAR_MAP
+    surf_vars : dict[str, Any], default = SURF_VAR_MAP
         Surface variable mapping.
     static_vars : dict[str, Any], default = STATIC_VAR_MAP
         Static variable mapping.
@@ -221,3 +223,85 @@ BATCH_FNS: dict[str, Callable[..., Batch]] = {
     "test": make_lowres_batch,
     "eval": load_batch_from_asset,
 }
+
+
+def validate_common_config(config: dict[str, Any]) -> tuple[Callable[..., Batch], int]:
+    """Validate config fields common to inference and fine-tuning.
+
+    Parameters
+    ----------
+    config : dict[str, typing.Any]
+        Configuration dictionary.
+
+    Returns
+    -------
+    batch_fn : collections.abc.Callable[..., aurora.Batch]
+        Batch creation function.
+    steps : int
+        Number of inference or fine-tuning steps.
+
+    Raises
+    ------
+    KeyError
+        If 'mode' field is missing or invalid.
+    ValueError
+        If 'steps' field is absent or less than 1.
+
+    """
+    if (steps := config.get("steps", 0)) < 1:
+        msg = "Absent or invalid 'steps' field, must be at least 1."
+        raise ValueError(msg)
+    try:
+        batch_fn = BATCH_FNS[config["mode"]]
+    except KeyError as e:
+        msg = f"Absent or invalid 'mode' field, must be one of {BATCH_FNS.keys()}."
+        raise KeyError(msg) from e
+    return batch_fn, steps
+
+
+def register_new_variables(
+    new_variables: dict[str, Any],
+) -> tuple[dict[str, dict[str, str]], dict[str, tuple[str, ...]]]:
+    """Register new variables to be added to the model and data.
+
+    Parameters
+    ----------
+    new_variables : dict[str, Any]
+        Mapping of long variable names to their information dictionaries.
+        Information must include key : value pairs for:
+        - "kind": one of "surf", "static", or "atmos"
+        - "key": variable shortname
+        - "location": normalisation location statistic
+        - "scale": normalisation scale statistic
+
+    Returns
+    -------
+    var_map : dict[str, dict[str, str]]
+        Updated variable mappings for "surf", "static", and "atmos" variables.
+    var_cfg : dict[str, tuple[str, ...]]
+        Updated Aurora configuration variable tuples.
+
+    Raises
+    ------
+    KeyError
+        If info["kind"] is not supported, currently "surf_vars", "static_vars", or
+        "atmos_vars".
+
+    """
+    var_map = {
+        "surf_vars": SURF_VAR_MAP.copy(),
+        "static_vars": STATIC_VAR_MAP.copy(),
+        "atmos_vars": ATMOS_VAR_MAP.copy(),
+    }
+    var_cfg = {}
+    for longname, info in new_variables.items():
+        try:
+            type_var_map = var_map[info["kind"]]
+        except KeyError as e:
+            msg = f"Unknown variable kind, must be one of {list(var_map.keys())}."
+            raise KeyError(msg) from e
+        type_var_map[longname] = info["key"]
+        var_cfg[f"{info['kind']}_vars"] = tuple(type_var_map.values())
+        normalisation.locations[info["key"]] = info.get("location", 0.0)
+        normalisation.scales[info["key"]] = info.get("scale", 1.0)
+    return var_map, var_cfg

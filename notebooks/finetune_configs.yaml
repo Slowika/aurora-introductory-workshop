@@ -83,5 +83,3 @@ eval_add_variable:
       key: d2m
       location: 0.0
       scale: 1.0
-
-# log mflow for all
