@@ -15,10 +15,10 @@ from setup.common.utils import create_mlclient
 
 if __name__ == "__main__":
     component = CommandComponent(
-        name="workshop_aurora_inference",
+        name="aurora_inference",
         display_name="Aurora Inference",
         description="Component for performing inference with Aurora.",
-        version="2",
+        version="1",
         command=(
             "python -m main "
             "--model ${{inputs.model}} "
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         ),
         code="./setup/components/inference/",
         # environment gets persisted in registered component
-        environment="aurora-inference:2",
+        environment="aurora-environment:1",
         # mode and path are stripped from inputs and outputs on registration
         inputs={
             "model": Input(

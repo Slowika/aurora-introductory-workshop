@@ -1,4 +1,7 @@
-"""Common utility constants."""
+"""Common utility constants.
+
+These include Aurora 0.25 pre-trained model variable mappings and atmospheric levels.
+"""
 
 SURF_VAR_MAP = {
     "10m_u_component_of_wind": "10u",

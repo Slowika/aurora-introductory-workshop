@@ -4,7 +4,7 @@ This file is used to inject environment variables set in the .env file in the pr
 root (i.e. aurora-introductory-workshop/.env) into the session's os.environ dictionary,
 serving as temporary environment variables with no clean-up required.
 
-This will be run when any code below /setup/ is imported.
+This will be run when any code below `setup` is imported.
 """
 
 import os

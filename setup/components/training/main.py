@@ -18,6 +18,27 @@ Running in Azure Machine Learning:
     See setup/components/training/component.py for definition and deployment, and
     notebooks/0_aurora_workshop.ipynb for example usage.
 
+Key configuration parameters:
+- type: Whether to perform short lead ("short") or autoregressive ("rollout")
+    fine-tuning.
+- mode: Whether to use synthetic data ("test") or real data ("era5").
+- steps: Number of fine-tuning steps to perform.
+- learning_rate: Learning rate for the optimiser.
+- [optional] rollout_steps: Number of autoregressive rollout steps per fine-tuning
+    step, only used if type is "rollout".
+- [optional] aurora_config: Dictionary of Aurora model configuration parameters to
+    override the default model configuration, e.g.:
+    {"aurora_config": {"use_lora": true, "lora_steps": 40}}.
+    See aurora.Aurora documentation for all valid keyword arguments.
+- [optional] extra_variables: Dictionary defining additional variables to include, e.g.:
+    {
+        <variable_era5_longname>: {
+            "kind": <surf_vars or atmos_vars>,
+            "key": <variable_era5_shortname>,
+            "location": <float>,
+            "scale": <float>
+        }
+    }
 """
 
 import argparse
@@ -272,7 +293,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        help="Path to the pretrained model checkpoint.",
+        help="Path to the pre-trained model checkpoint.",
     )
     parser.add_argument(
         "--data",
@@ -282,7 +303,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--start_datetime",
         type=datetime.fromisoformat,
-        help="Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00.",
+        help=(
+            "Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00. "
+            "This datetime and that -6 hours must be present in the data."
+        ),
     )
     parser.add_argument(
         "--config",
@@ -292,17 +316,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--loss",
         type=str,
-        help="Path to which loss history will be written.",
+        help="Path to which the loss history NumPy array will be written.",
     )
     parser.add_argument(
         "--prediction",
         type=str,
-        help="Path to which the final prediction will be written.",
+        help="Path to which the final prediction NetCDF file will be written.",
     )
     parser.add_argument(
         "--finetuned",
         type=str,
-        help="Path to which the fine-tuned model state will be written.",
+        help="Path to which the fine-tuned model state .ckpt file will be written.",
     )
     args = parser.parse_args()
 
@@ -344,7 +368,6 @@ if __name__ == "__main__":
     )
 
     LOG.info("Starting fine-tuning: start=%s, steps=%d", args.start_datetime, ft_steps)
-    # TODO: mlflow logging, add libs to dockerfile
     prediction, loss_history = finetune_fn(
         model=model,
         params=params,

@@ -2,13 +2,13 @@ test:
   steps: 4  # minimum 1
   mode: test  # run with synthetic data
 
-eval:
+era5:
   steps: 4
-  mode: eval  # run with real data
+  mode: era5  # run with real data
 
 new_variables:
   steps: 4
-  mode: eval
+  mode: era5
   extra_variables:
     2m_dewpoint_temperature:
       kind: surf

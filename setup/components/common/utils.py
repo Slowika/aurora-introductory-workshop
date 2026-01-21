@@ -57,7 +57,7 @@ def load_model(
 
     Returns
     -------
-    aurora.AuroraPretrained
+    model : aurora.AuroraPretrained
         Loaded Aurora model.
 
     """
@@ -77,7 +77,7 @@ def make_lowres_batch(
     times: int = 2,
     **_: dict,
 ) -> Batch:
-    """Create a small 17x32 batch on the given device.
+    """Generate a 16Y, 32X low-resolution dummy batch for testing.
 
     Parameters
     ----------
@@ -219,10 +219,11 @@ def batch_to_xarray(batch: Batch) -> xr.Dataset:
         },
     )
 
+
 # mapping of data modes to batch creation functions
 BATCH_FNS: dict[str, Callable[..., Batch]] = {
     "test": make_lowres_batch,
-    "eval": load_batch_from_asset,
+    "era5": load_batch_from_asset,
 }
 
 
@@ -270,7 +271,7 @@ def register_new_variables(
     new_variables : dict[str, Any]
         Mapping of long variable names to their information dictionaries.
         Information must include key : value pairs for:
-        - "kind": one of "surf", "static", or "atmos"
+        - "kind": one of "surf_vars", "static_vars", or "atmos_vars"
         - "key": variable shortname
         - "location": normalisation location statistic
         - "scale": normalisation scale statistic
@@ -278,7 +279,8 @@ def register_new_variables(
     Returns
     -------
     var_map : dict[str, dict[str, str]]
-        Updated variable mappings for "surf", "static", and "atmos" variables.
+        Updated variable mappings for "surf_vars", "static_vars", and "atmos_vars"
+        variables.
     var_cfg : dict[str, tuple[str, ...]]
         Updated Aurora configuration variable tuples.
 

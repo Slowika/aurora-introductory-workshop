@@ -9,17 +9,17 @@ test_short_lead:
   aurora_config:
     autocast: true
 
-eval_short_lead:
+era5_short_lead:
   type: short
-  mode: eval
+  mode: era5
   steps: 5
   learning_rate: 3e-5
   aurora_config:
     autocast: true
 
-eval_short_lead_lora:
+era5_short_lead_lora:
   type: short
-  mode: eval
+  mode: era5
   steps: 5
   learning_rate: 3e-5
   aurora_config:
@@ -38,9 +38,9 @@ test_autoregressive:
     use_lora: false
     autocast: true
 
-eval_autoregressive:
+era5_autoregressive:
   type: rollout
-  mode: eval
+  mode: era5
   steps: 5
   rollout_steps: 4
   learning_rate: 3e-5
@@ -64,13 +64,13 @@ test_add_variable:
     2m_dewpoint_temperature:
       kind: surf_vars
       key: d2m
-      location: 0.0  # use real normalisation stats if possible
+      location: 0.0
       scale: 1.0
 
-eval_add_variable:
+era5_add_variable:
   type: short
   steps: 5
-  mode: eval
+  mode: era5
   learning_rate: 3e-5
   aurora_config:
     use_lora: true
@@ -81,5 +81,7 @@ eval_add_variable:
     2m_dewpoint_temperature:
       kind: surf_vars
       key: d2m
-      location: 0.0
-      scale: 1.0
+      # use real normalisation stats if possible
+      # not providing can lead to unstable training
+      location: 273.4723  # mean or median
+      scale: 19.165396  # stdev

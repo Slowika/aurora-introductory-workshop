@@ -15,6 +15,17 @@ Running locally:
 Running in Azure Machine Learning:
     See setup/components/inference/component.py for definition and deployment, and
     notebooks/0_aurora_workshop.ipynb for example usage.
+
+Key configuration parameters:
+- steps: Number of inference steps to perform.
+- mode: Whether to use synthetic data ("test") or real data ("era5").
+- [optional] extra_variables: Dictionary defining additional variables to include, e.g.:
+    {
+        <variable_era5_longname>: {
+            "kind": <surf_vars or atmos_vars>,
+            "key": <variable_era5_shortname>
+        }
+    }
 """
 
 import argparse
@@ -50,7 +61,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        help="Path to the pretrained model checkpoint.",
+        help="Path to the pre-trained model checkpoint.",
     )
     parser.add_argument(
         "--data",
@@ -60,7 +71,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--start_datetime",
         type=datetime.fromisoformat,
-        help="Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00.",
+        help=(
+            "Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00. "
+            "This datetime and that -6 hours must be present in the data."
+        ),
     )
     parser.add_argument(
         "--config",

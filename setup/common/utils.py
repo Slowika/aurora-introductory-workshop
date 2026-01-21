@@ -13,8 +13,12 @@ def get_aml_ci_env_vars() -> tuple[str, str, str]:
 
     Returns
     -------
-    tuple[str, str, str]
-        Subscription ID, resource group name, AML workspace name.
+    sub_id : str
+        Azure subscription ID
+    rg_name : str
+        Azure resource group name
+    ws_name : str
+        Azure ML workspace name
 
     Raises
     ------
@@ -33,8 +37,12 @@ def get_local_env_vars() -> tuple[str, str, str]:
 
     Returns
     -------
-    tuple[str, str, str]
-        Subscription ID, resource group name, AML workspace name.
+    sub_id : str
+        Azure subscription ID
+    rg_name : str
+        Azure resource group name
+    ws_name : str
+        Azure ML workspace name
 
     Raises
     ------
