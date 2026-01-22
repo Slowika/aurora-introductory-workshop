@@ -1,0 +1,87 @@
+# settings for Aurora should be passed under the aurora_config key
+# see aurora.model.aurora.Aurora for all valid Aurora keyword arguments
+
+test_short_lead:
+  type: short
+  mode: test
+  epochs: 5
+  learning_rate: 3e-5
+  aurora_config:
+    autocast: true
+
+era5_short_lead:
+  type: short
+  mode: era5
+  epochs: 5
+  learning_rate: 3e-5
+  aurora_config:
+    autocast: true
+
+era5_short_lead_lora:
+  type: short
+  mode: era5
+  epochs: 5
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+
+test_autoregressive:
+  type: rollout
+  mode: test
+  epochs: 5
+  rollout_steps: 4
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: false
+    autocast: true
+
+era5_autoregressive:
+  type: rollout
+  mode: era5
+  epochs: 5
+  rollout_steps: 4
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+
+test_add_variable:
+  type: short
+  mode: test
+  epochs: 5
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+  extra_variables:
+    2m_dewpoint_temperature:
+      kind: surf_vars
+      key: d2m
+      location: 0.0
+      scale: 1.0
+
+era5_add_variable:
+  type: short
+  epochs: 5
+  mode: era5
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+  extra_variables:
+    2m_dewpoint_temperature:
+      kind: surf_vars
+      key: d2m
+      # use real normalisation stats if possible
+      # not providing can lead to unstable training
+      location: 273.4723  # mean 2025-01 (median also works)
+      scale: 19.165396  # stdev 2025-01
