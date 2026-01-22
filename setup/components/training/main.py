@@ -162,7 +162,8 @@ def get_datetime_range(
         start + step * i for i
         in range(int((end - start).total_seconds() // step.total_seconds()) + 1)
     ]
-    if len(timestamps) < 2:
+    min_ts = 2
+    if len(timestamps) < min_ts:
         msg = (
             "Less than two timestamps generated, check start datetime is at least "
             f"{step.total_seconds() / 3600} hours before end."
@@ -378,7 +379,7 @@ if __name__ == "__main__":
         "--start_datetime",
         type=datetime.fromisoformat,
         help=(
-            "Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00. "
+            "Start ISO 8601 format datetime e.g. 2025-01-01T00:00:00. "
             "This datetime and that -6 hours must be present in the data."
         ),
     )
@@ -386,7 +387,7 @@ if __name__ == "__main__":
         "--end_datetime",
         type=datetime.fromisoformat,
         help=(
-            "End ISO 8601 format datetime e.g. 2026-01-01T00:00:00. "
+            "End ISO 8601 format datetime e.g. 2025-01-31T23:00:00. "
             "This datetime is only possibly used as a target."
         ),
     )
@@ -471,10 +472,6 @@ if __name__ == "__main__":
     ds.to_netcdf(args.prediction)
 
     LOG.info("Writing model: path=%s", args.finetuned)
-    state = model.state_dict()
-    if lora:
-        LOG.info("Saving LoRA weights only.")
-        state = {k: v for k, v in state.items() if "lora" in k.lower()}
-    torch.save(state, args.finetuned)
+    torch.save(model.state_dict(), args.finetuned)
 
     LOG.info("Done!")

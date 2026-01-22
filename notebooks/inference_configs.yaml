@@ -11,5 +11,5 @@ new_variables:
   mode: era5
   extra_variables:
     2m_dewpoint_temperature:
-      kind: surf
+      kind: surf_vars
       key: d2m
