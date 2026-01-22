@@ -24,3 +24,18 @@ aurora_introductory_workshop/
 │       └── register_model.ipynb: download a specified Aurora variant checkpoint from Hugging Face and register it as a model asset within the workspace.
 └── .template.env: contains environment variables to be set for local use, particularly relevant to workspace setup. Copy to a new file named `.env` and fill values.
 ```
+
+## Environment variables
+
+Three environment variables are required for local use:
+
+- SUBSCRIPTION_ID: ID of the subscription in which resources exist
+- RESOURCE_GROUP_NAME: name of the resource group in which resources exist
+- WORKSPACE_NAME: name of the Azure Machine Learning workspace to use
+
+These can be set permanently via .bashrc or the Windows environment variable manager or temporarily through a `.env` file. See `./.template.env`.
+
+Three environment variables are required for remote use but are automatically set in Azure Machine Learning compute instances:
+- MLFLOW_TRACKING_URI: used to extract the ID of the subscription in which resources exist
+- CI_RESOURCE_GROUP: name of the resource group in which resources exist
+- CI_WORKSPACE: name of the Azure Machine Learning workspace to use

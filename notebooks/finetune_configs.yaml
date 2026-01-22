@@ -4,7 +4,7 @@
 test_short_lead:
   type: short
   mode: test
-  steps: 5
+  epochs: 5
   learning_rate: 3e-5
   aurora_config:
     autocast: true
@@ -12,7 +12,7 @@ test_short_lead:
 era5_short_lead:
   type: short
   mode: era5
-  steps: 5
+  epochs: 5
   learning_rate: 3e-5
   aurora_config:
     autocast: true
@@ -20,7 +20,7 @@ era5_short_lead:
 era5_short_lead_lora:
   type: short
   mode: era5
-  steps: 5
+  epochs: 5
   learning_rate: 3e-5
   aurora_config:
     use_lora: true
@@ -31,7 +31,7 @@ era5_short_lead_lora:
 test_autoregressive:
   type: rollout
   mode: test
-  steps: 5
+  epochs: 5
   rollout_steps: 4
   learning_rate: 3e-5
   aurora_config:
@@ -41,7 +41,7 @@ test_autoregressive:
 era5_autoregressive:
   type: rollout
   mode: era5
-  steps: 5
+  epochs: 5
   rollout_steps: 4
   learning_rate: 3e-5
   aurora_config:
@@ -53,7 +53,7 @@ era5_autoregressive:
 test_add_variable:
   type: short
   mode: test
-  steps: 5
+  epochs: 5
   learning_rate: 3e-5
   aurora_config:
     use_lora: true
@@ -69,7 +69,7 @@ test_add_variable:
 
 era5_add_variable:
   type: short
-  steps: 5
+  epochs: 5
   mode: era5
   learning_rate: 3e-5
   aurora_config:
@@ -83,5 +83,5 @@ era5_add_variable:
       key: d2m
       # use real normalisation stats if possible
       # not providing can lead to unstable training
-      location: 273.4723  # mean or median
-      scale: 19.165396  # stdev
+      location: 273.4723  # mean 2025-01 (median also works)
+      scale: 19.165396  # stdev 2025-01

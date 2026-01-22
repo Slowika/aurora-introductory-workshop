@@ -24,6 +24,7 @@ if __name__ == "__main__":
             "--model ${{inputs.model}} "
             "--data ${{inputs.data}} "
             "--start_datetime ${{inputs.start_datetime}} "
+            "--end_datetime ${{inputs.end_datetime}} "
             # config arg wrapped in single quotes to handle JSON format
             "--config '${{inputs.config}}' "
             "--loss ${{outputs.loss}} "
@@ -46,7 +47,15 @@ if __name__ == "__main__":
             "start_datetime": Input(
                 type="string",
                 description=(
-                    "Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00."
+                    "Start ISO 8601 format datetime e.g. 2025-01-01T00:00:00. "
+                    "This datetime and that -6 hours must be present in the data."
+                ),
+            ),
+            "end_datetime": Input(
+                type="string",
+                description=(
+                    "End ISO 8601 format datetime e.g. 2025-01-31T23:00:00. "
+                    "This datetime is only possibly used as a target."
                 ),
             ),
             "config": Input(

@@ -88,7 +88,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    batch_fn, inf_steps = validate_common_config(args.config)
+    if (inf_steps := args.config.get("steps", 0)) < 1:
+        msg = "Absent or invalid 'steps' field, must be at least 1."
+        raise ValueError(msg)
+    batch_fn = validate_common_config(args.config)
     var_map, var_cfg = register_new_variables(args.config.get("extra_variables", {}))
     init_batch = batch_fn(
         data_path=args.data,

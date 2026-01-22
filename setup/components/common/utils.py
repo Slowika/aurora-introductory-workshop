@@ -61,6 +61,7 @@ def load_model(
         Loaded Aurora model.
 
     """
+    # pop and cast to bool for type safety
     strict = bool(cfg.pop("strict", True))
     model = AuroraPretrained(use_lora=bool(cfg.pop("use_lora", False)), **cfg)
     model.load_checkpoint_local(model_path, strict)
@@ -227,7 +228,7 @@ BATCH_FNS: dict[str, Callable[..., Batch]] = {
 }
 
 
-def validate_common_config(config: dict[str, Any]) -> tuple[Callable[..., Batch], int]:
+def validate_common_config(config: dict[str, Any]) -> Callable[..., Batch]:
     """Validate config fields common to inference and fine-tuning.
 
     Parameters
@@ -237,28 +238,20 @@ def validate_common_config(config: dict[str, Any]) -> tuple[Callable[..., Batch]
 
     Returns
     -------
-    batch_fn : collections.abc.Callable[..., aurora.Batch]
+    collections.abc.Callable[..., aurora.Batch]
         Batch creation function.
-    steps : int
-        Number of inference or fine-tuning steps.
 
     Raises
     ------
     KeyError
         If 'mode' field is missing or invalid.
-    ValueError
-        If 'steps' field is absent or less than 1.
 
     """
-    if (steps := config.get("steps", 0)) < 1:
-        msg = "Absent or invalid 'steps' field, must be at least 1."
-        raise ValueError(msg)
     try:
-        batch_fn = BATCH_FNS[config["mode"]]
+        return BATCH_FNS[config["mode"]]
     except KeyError as e:
         msg = f"Absent or invalid 'mode' field, must be one of {BATCH_FNS.keys()}."
         raise KeyError(msg) from e
-    return batch_fn, steps
 
 
 def register_new_variables(
