@@ -112,9 +112,9 @@ if __name__ == "__main__":
     LOG.info("%s mode enabled.", args.config["mode"])
 
     LOG.info("Loading model: path=%s", args.model)
-    aurora_cfg = args.config.get("aurora_config", {})
-    model = load_model(args.model, train=False, **var_cfg | aurora_cfg)
-    LOG.info("Loaded model using config: %s", var_cfg)
+    cfg = args.config.get("aurora_config", {}) | var_cfg
+    model = load_model(args.model, train=False, **cfg)
+    LOG.info("Loaded model using config: %s", cfg)
 
     LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, inf_steps)
     with torch.inference_mode():
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     preds_ds = xr.concat(datasets, dim="time")
     preds_ds.to_netcdf(args.predictions)
 
-    LOG.info("Starting evaluation.")
+    LOG.info("Starting evaluation of surface variables.")
     eval_datetime = pred.metadata.time[0]
     target = batch_fn(
         data_path=args.data,
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         **var_map,
     )
     for longname, shortname in var_map["surf_vars"].items():
-        LOG.info("Starting evaluation for variable: %s", longname)
+        LOG.info("Starting evaluation: variable=%s", longname)
         target_t = target.surf_vars[shortname]
         prediction_t = pred.surf_vars[shortname]
 
@@ -174,6 +174,6 @@ if __name__ == "__main__":
         )
         mlflow.log_figure(fig, f"{longname}_{eval_datetime}_prediction_error_map.png")
         plt.close(fig)
-        LOG.info("Finished evaluation for variable: %s", longname)
+        LOG.info("Finished evaluation: variable=%s", longname)
 
     LOG.info("Done!")
