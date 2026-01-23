@@ -17,7 +17,7 @@ if __name__ == "__main__":
     component = CommandComponent(
         name="aurora_inference",
         display_name="Aurora Inference",
-        description="Component for performing inference with Aurora.",
+        description="Component for performing inference and evaluation with Aurora.",
         version="1",
         command=(
             "python -m main "

@@ -8,4 +8,4 @@ RUN pip install microsoft-aurora
 RUN pip install xarray zarr dask matplotlib cartopy
 
 # azure ml extras for workspace interaction, auth, and logging
-RUN pip install azure-ai-ml mlflow azureml-mlflow
+RUN pip install azure-ai-ml mlflow==3.1.1 azureml-mlflow

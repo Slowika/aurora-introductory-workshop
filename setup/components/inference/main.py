@@ -39,7 +39,6 @@ import mlflow
 import torch
 import xarray as xr
 from aurora import rollout
-from cartopy.mpl.geoaxes import GeoAxes
 
 # NOTE: enable imports in local and remote environments
 try:
@@ -144,12 +143,12 @@ if __name__ == "__main__":
         # compute and log RMSE for the whole planet
         rmse = rmse_loss(prediction_t, target_t).item()
         LOG.info("RMSE: %.4f", rmse)
-        mlflow.log_metric(f"{longname} (RMSE)", rmse)
+        mlflow.log_metric(f"{longname} RMSE", rmse)
 
         # display difference between prediction and ground truth
         diff_t = (prediction_t - target_t).squeeze().cpu().numpy()
         fig = plt.figure(figsize=(40, 50))
-        ax = GeoAxes(projection=ccrs.PlateCarree())
+        ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
         extent = (-180., 180., -90., 90.)
         ax.set_extent(extents=extent)
         ax.coastlines()
@@ -167,7 +166,7 @@ if __name__ == "__main__":
             f"Predicted vs. ground-truth - {longname} - {eval_datetime} - "
             f"{inf_steps} steps",
         )
-        mlflow.log_figure(fig, f"{longname}_prediction_error_map.png")
+        mlflow.log_figure(fig, f"{longname}_{eval_datetime}_prediction_error_map.png")
         plt.close(fig)
         LOG.info("Finished evaluation for variable: %s", longname)
 
