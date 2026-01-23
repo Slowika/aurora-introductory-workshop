@@ -2,7 +2,8 @@
 
 This script takes a set of arguments through the command line to perform autoregressive
 forecasting using a pretrained Aurora model. All generated forecasts are written to a
-NetCDF file at the specified output path.
+NetCDF file at the specified output path. The final prediction is evaluated against
+ground-truth data and relevant metrics and figures are logged with MLflow.
 
 Running locally:
     python -m setup.components.inference.main \
@@ -32,12 +33,17 @@ import argparse
 import json
 from datetime import datetime
 
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import mlflow
 import torch
 import xarray as xr
 from aurora import rollout
+from cartopy.mpl.geoaxes import GeoAxes
 
 # NOTE: enable imports in local and remote environments
 try:
+    from common.loss import rmse_loss
     from common.utils import (
         batch_to_xarray,
         create_logger,
@@ -46,6 +52,7 @@ try:
         validate_common_config,
     )
 except ImportError:
+    from setup.components.common.loss import rmse_loss
     from setup.components.common.utils import (
         batch_to_xarray,
         create_logger,
@@ -115,9 +122,53 @@ if __name__ == "__main__":
             )
             datasets.append(batch_to_xarray(pred))
     LOG.info("Completed %d inference steps.", inf_steps)
+    model = model.to("cpu")
 
     LOG.info("Concatenating and writing predictions: path=%s", args.predictions)
     preds_ds = xr.concat(datasets, dim="time")
     preds_ds.to_netcdf(args.predictions)
+
+    LOG.info("Starting evaluation.")
+    eval_datetime = pred.metadata.time[0]
+    target = batch_fn(
+        data_path=args.data,
+        start_datetime=eval_datetime,
+        times=1,
+        **var_map,
+    )
+    for longname, shortname in var_map["surf_vars"].items():
+        LOG.info("Starting evaluation for variable: %s", longname)
+        target_t = target.surf_vars[shortname]
+        prediction_t = pred.surf_vars[shortname]
+
+        # compute and log RMSE for the whole planet
+        rmse = rmse_loss(prediction_t, target_t).item()
+        LOG.info("RMSE: %.4f", rmse)
+        mlflow.log_metric(f"{longname} (RMSE)", rmse)
+
+        # display difference between prediction and ground truth
+        diff_t = (prediction_t - target_t).squeeze().cpu().numpy()
+        fig = plt.figure(figsize=(40, 50))
+        ax = GeoAxes(projection=ccrs.PlateCarree())
+        extent = (-180., 180., -90., 90.)
+        ax.set_extent(extents=extent)
+        ax.coastlines()
+        ax.gridlines(draw_labels=True)
+        im = ax.imshow(
+            diff_t,
+            origin="upper",
+            extent=extent,
+            transform=ccrs.PlateCarree(),
+            vmin=diff_t.min(),
+            vmax=diff_t.max(),
+        )
+        plt.colorbar(im, ax=ax, orientation="horizontal", pad=0.05, shrink=0.8)
+        ax.set_title(
+            f"Predicted vs. ground-truth - {longname} - {eval_datetime} - "
+            f"{inf_steps} steps",
+        )
+        mlflow.log_figure(fig, f"{longname}_prediction_error_map.png")
+        plt.close(fig)
+        LOG.info("Finished evaluation for variable: %s", longname)
 
     LOG.info("Done!")
