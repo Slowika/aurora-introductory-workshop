@@ -429,8 +429,12 @@ if __name__ == "__main__":
     var_map, var_cfg = register_new_variables(new_vars or {})
     LOG.info("Variables to fine-tune: %s", var_map)
     cfg = args.config["aurora_config"] | var_cfg
-    cfg["strict"] = not (lora := cfg.get("use_lora", False)) and (new_vars is None)
-    model = load_model(args.model, train=True, **cfg)
+    model = load_model(
+        args.model,
+        train=True,
+        strict=not (lora := cfg.get("use_lora", False)) and (new_vars is None),
+        **cfg,
+    )
     LOG.info("Loaded model using config: %s", cfg)
 
     if (epochs := args.config.get("epochs", 0)) < 1:
@@ -472,6 +476,19 @@ if __name__ == "__main__":
     ds.to_netcdf(args.prediction)
 
     LOG.info("Writing model: path=%s", args.finetuned)
-    torch.save(model.state_dict(), args.finetuned)
+    model_state = {
+        k: (
+            v.to(dtype=torch.bfloat16) if torch.is_tensor(v) and v.is_floating_point()
+            else v
+        )
+        for k, v in model.state_dict().items()
+    }
+    if lora:
+        LOG.info("Updating model with LoRA: path=%s", args.finetuned)
+        base_state = torch.load(args.model, map_location="cpu", weights_only=True)
+        base_state.update(model_state)
+        torch.save(base_state, args.finetuned)
+    else:
+        torch.save(model_state, args.finetuned)
 
     LOG.info("Done!")

@@ -20,6 +20,11 @@ Running in Azure Machine Learning:
 Key configuration parameters:
 - steps: Number of inference steps to perform.
 - mode: Whether to use synthetic data ("test") or real data ("era5").
+- [optional] aurora_config: Dictionary of Aurora model configuration parameters to
+    override the default model configuration, e.g.:
+    {"aurora_config": {"use_lora": true}}.
+    See aurora.Aurora documentation for all valid keyword arguments.
+    Required, with attribute "use_lora": true, when using LoRA fine-tuned models.
 - [optional] extra_variables: Dictionary defining additional variables to include, e.g.:
     {
         <variable_era5_longname>: {
@@ -107,7 +112,8 @@ if __name__ == "__main__":
     LOG.info("%s mode enabled.", args.config["mode"])
 
     LOG.info("Loading model: path=%s", args.model)
-    model = load_model(args.model, train=False, **var_cfg)
+    aurora_cfg = args.config.get("aurora_config", {})
+    model = load_model(args.model, train=False, **var_cfg | aurora_cfg)
     LOG.info("Loaded model using config: %s", var_cfg)
 
     LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, inf_steps)
