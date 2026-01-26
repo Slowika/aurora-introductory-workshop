@@ -12,12 +12,20 @@ from pathlib import Path
 
 root = Path(__file__).parent.parent  # ensures checking the project root
 env_path = root / ".env"
-if not env_path.exists():
-    msg = "No .env file found in current directory."
-    raise FileNotFoundError(msg)
-with env_path.open() as f:
-    for line in f.readlines():
-        if not line or line.startswith("#"):
-            continue
-        name, value = line.split("=", 1)
-        os.environ[name] = value.strip()
+is_aml_ci_env = bool(os.environ.get("CI_WORKSPACE"))
+if is_aml_ci_env:
+    # skip loading .env when in AML CI environment as variables pre-set
+    pass
+else:
+    if not env_path.exists():
+        msg = (
+            "No .env file found in current directory - copy .template.env to .env and "
+            "populate values."
+        )
+        raise FileNotFoundError(msg)
+    with env_path.open() as f:
+        for line in f.readlines():
+            if not line or line.startswith("#"):
+                continue
+            name, value = line.split("=", 1)
+            os.environ[name] = value.strip()
