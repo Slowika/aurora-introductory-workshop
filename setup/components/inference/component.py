@@ -17,7 +17,7 @@ if __name__ == "__main__":
     component = CommandComponent(
         name="aurora_inference",
         display_name="Aurora Inference",
-        description="Component for performing inference with Aurora.",
+        description="Component for performing inference and evaluation with Aurora.",
         version="1",
         command=(
             "python -m main "
@@ -45,7 +45,7 @@ if __name__ == "__main__":
                 type="string",
                 description=(
                     "Start ISO 8601 format datetime for initial state data e.g. "
-                    "2026-01-01T00:00:00."
+                    "2025-01-01T00:00:00."
                 ),
             ),
             "config": Input(

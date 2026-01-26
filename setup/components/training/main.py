@@ -162,7 +162,8 @@ def get_datetime_range(
         start + step * i for i
         in range(int((end - start).total_seconds() // step.total_seconds()) + 1)
     ]
-    if len(timestamps) < 2:
+    min_ts = 2
+    if len(timestamps) < min_ts:
         msg = (
             "Less than two timestamps generated, check start datetime is at least "
             f"{step.total_seconds() / 3600} hours before end."
@@ -378,7 +379,7 @@ if __name__ == "__main__":
         "--start_datetime",
         type=datetime.fromisoformat,
         help=(
-            "Start ISO 8601 format datetime e.g. 2026-01-01T00:00:00. "
+            "Start ISO 8601 format datetime e.g. 2025-01-01T00:00:00. "
             "This datetime and that -6 hours must be present in the data."
         ),
     )
@@ -386,7 +387,7 @@ if __name__ == "__main__":
         "--end_datetime",
         type=datetime.fromisoformat,
         help=(
-            "End ISO 8601 format datetime e.g. 2026-01-01T00:00:00. "
+            "End ISO 8601 format datetime e.g. 2025-01-31T23:00:00. "
             "This datetime is only possibly used as a target."
         ),
     )
@@ -428,8 +429,12 @@ if __name__ == "__main__":
     var_map, var_cfg = register_new_variables(new_vars or {})
     LOG.info("Variables to fine-tune: %s", var_map)
     cfg = args.config["aurora_config"] | var_cfg
-    cfg["strict"] = not (lora := cfg.get("use_lora", False)) and (new_vars is None)
-    model = load_model(args.model, train=True, **cfg)
+    model = load_model(
+        args.model,
+        train=True,
+        strict=not (lora := cfg.get("use_lora", False)) and (new_vars is None),
+        **cfg,
+    )
     LOG.info("Loaded model using config: %s", cfg)
 
     if (epochs := args.config.get("epochs", 0)) < 1:
@@ -471,10 +476,19 @@ if __name__ == "__main__":
     ds.to_netcdf(args.prediction)
 
     LOG.info("Writing model: path=%s", args.finetuned)
-    state = model.state_dict()
+    model_state = {
+        k: (
+            v.to(dtype=torch.bfloat16) if torch.is_tensor(v) and v.is_floating_point()
+            else v
+        )
+        for k, v in model.state_dict().items()
+    }
     if lora:
-        LOG.info("Saving LoRA weights only.")
-        state = {k: v for k, v in state.items() if "lora" in k.lower()}
-    torch.save(state, args.finetuned)
+        LOG.info("Updating model with LoRA: path=%s", args.finetuned)
+        base_state = torch.load(args.model, map_location="cpu", weights_only=True)
+        base_state.update(model_state)
+        torch.save(base_state, args.finetuned)
+    else:
+        torch.save(model_state, args.finetuned)
 
     LOG.info("Done!")

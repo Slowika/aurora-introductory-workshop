@@ -42,6 +42,7 @@ def load_model(
     model_path: str,
     *,
     train: bool,
+    strict: bool = True,
     **cfg: dict[str, Any],
 ) -> AuroraPretrained:
     """Load the Aurora pre-trained model from a local checkpoint.
@@ -52,6 +53,9 @@ def load_model(
         Path to the local model checkpoint.
     train : bool
         Whether to set the model to training mode.
+    strict : bool, default = True
+        Error if the model parameters are not exactly equal to the parameters in the
+        checkpoint. Defaults to True.
     cfg : dict[str, Any]
         Additional keyword arguments to pass to the AuroraPretrained constructor.
 
@@ -61,8 +65,6 @@ def load_model(
         Loaded Aurora model.
 
     """
-    # pop and cast to bool for type safety
-    strict = bool(cfg.pop("strict", True))
     model = AuroraPretrained(use_lora=bool(cfg.pop("use_lora", False)), **cfg)
     model.load_checkpoint_local(model_path, strict)
     if train and hasattr(model, "configure_activation_checkpointing"):

@@ -6,10 +6,12 @@ era5:
   steps: 4
   mode: era5  # run with real data
 
-new_variables:
+new_variables_lora:
   steps: 4
   mode: era5
+  aurora_config:
+    use_lora: true  # needed if the model was fine-tuned with LoRA
   extra_variables:
     2m_dewpoint_temperature:
-      kind: surf
+      kind: surf_vars
       key: d2m
