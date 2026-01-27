@@ -1,9 +1,8 @@
 """Aurora fine-tuning script.
 
-This script takes a set of arguments through the command line to perform simple fine-
-tuning (updating all weights) of a pretrained Aurora model. The loss history of all
-fine-tuning epochs and the final forecast made with the fine-tuned model are written to
-specified output paths.
+This script takes a set of arguments through the command line to perform fine-tuning of
+a pretrained Aurora model. The loss history of all fine-tuning epochs and the final
+forecast made with the fine-tuned model are written to specified output paths.
 
 Running locally:
     python -m setup.components.training.main \
