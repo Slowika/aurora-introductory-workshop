@@ -2,6 +2,7 @@
 
 from typing import ClassVar
 
+import numpy as np
 import torch
 from aurora import Batch
 
@@ -87,7 +88,7 @@ def atmos_tensor(batch: Batch) -> torch.Tensor:
     return torch.stack([batch.atmos_vars[vid] for vid in ATMOS_VARS])
 
 
-def weighted_mae_loss(pred: Batch, target: Batch) -> torch.Tensor:
+def weighted_mae(pred: Batch, target: Batch, area_weighted: bool) -> torch.Tensor:
     """Area-weighted mean absolute error, following Bodnar et al. (2025).
 
     Note: this does not currently account for new variables beyond those present in the
@@ -111,8 +112,13 @@ def weighted_mae_loss(pred: Batch, target: Batch) -> torch.Tensor:
     surf_targets = surf_tensor(target)
     atmos_preds = atmos_tensor(pred)
     atmos_targets = atmos_tensor(target)
-    surf_abs_err = (surf_preds - surf_targets).abs()
-    atmos_abs_err = (atmos_preds - atmos_targets).abs()
+    (_c, h, _w) = atmos_preds.shape
+    if area_weighted:
+        area_w = np.cos(np.linspace(-0.5 * np.pi, 0.5 * np.pi, h))
+    else:
+        area_w = np.ones(h)
+    surf_abs_err = (surf_preds - surf_targets).abs() * area_w.reshape((1, h, 1))
+    atmos_abs_err = (atmos_preds - atmos_targets).abs() * area_w.reshape((1, 1, h, 1))
     device = surf_preds.device
     surf_loss = (surf_var_weights.to(device) * surf_abs_err).sum()
     atmos_loss = (atmos_var_weights.to(device) * atmos_abs_err).sum()

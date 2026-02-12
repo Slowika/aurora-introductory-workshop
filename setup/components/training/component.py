@@ -30,6 +30,7 @@ if __name__ == "__main__":
             "--loss ${{outputs.loss}} "
             "--prediction ${{outputs.prediction}} "
             "--finetuned ${{outputs.finetuned}}"
+            "--area_weighted ${{outputs.area_weighted}}"
         ),
         code="./setup/components/training/",
         # environment gets persisted in registered component
@@ -61,6 +62,11 @@ if __name__ == "__main__":
             "config": Input(
                 type="string",
                 description="JSON string of fine-tuning configuration.",
+            ),
+            "area_weighted": Input(
+                type="boolean",
+                default=False,
+                description="Whether the MAE loss is area-weighted.",
             ),
         },
         outputs={
