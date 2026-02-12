@@ -1,6 +1,6 @@
 # Aurora Introductory Workshop
 
-This repository comprises resources for the Aurora fine-tuning on Azure Machine Learning (AML) workshop.
+This repository comprises resources for the [Aurora](https://github.com/microsoft/aurora) fine-tuning on Azure Machine Learning (AML) workshop.
 
 ## Repository structure
 
