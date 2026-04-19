@@ -2,7 +2,6 @@
 
 from typing import ClassVar
 
-import numpy as np
 import torch
 from aurora import Batch
 
@@ -112,25 +111,36 @@ def weighted_mae(pred: Batch, target: Batch, area_weighted: bool) -> torch.Tenso
     surf_targets = surf_tensor(target)
     atmos_preds = atmos_tensor(pred)
     atmos_targets = atmos_tensor(target)
-    (_c, h, _w) = atmos_preds.shape
-    if area_weighted:
-        area_w = np.cos(np.linspace(-0.5 * np.pi, 0.5 * np.pi, h))
-    else:
-        area_w = np.ones(h)
-    surf_abs_err = (surf_preds - surf_targets).abs() * area_w.reshape((1, h, 1))
-    atmos_abs_err = (atmos_preds - atmos_targets).abs() * area_w.reshape((1, 1, h, 1))
+
     device = surf_preds.device
-    surf_loss = (surf_var_weights.to(device) * surf_abs_err).sum()
-    atmos_loss = (atmos_var_weights.to(device) * atmos_abs_err).sum()
-    # normalisation denominator H x W
-    surf_size = surf_loss.numel() / SURF_VARS_COUNT
-    # normalisation denominator C x H x W
-    atmos_size = atmos_loss.numel() / ATMOS_VARS_COUNT
+    dtype = surf_preds.dtype
+
+    h = surf_preds.shape[-2]
+
+    if area_weighted:
+        lat = torch.as_tensor(target.metadata.lat)
+        area_w = torch.cos(torch.deg2rad(lat))
+    else:
+        area_w = torch.ones(h, device=device, dtype=dtype)
+    # normalise area weights
+    area_w = area_w / torch.sum(area_w)
+
+    # reshape weights
+    surf_w = area_w.view(1, 1, 1, h, 1)
+    atmos_w = area_w.view(1, 1, 1, 1, h, 1)
+
+    # absolute errors
+    surf_abs_err = torch.abs(surf_preds - surf_targets) * surf_w
+    atmos_abs_err = torch.abs(atmos_preds - atmos_targets) * atmos_w
+
+    surf_loss = (surf_var_weights * surf_abs_err).sum()
+    atmos_loss = (atmos_var_weights * atmos_abs_err).sum()
+
     # total loss
     return (
         (
-            ERA5FineTuningParams.SURF_LOSS_WEIGHT * surf_loss / surf_size
-            + ERA5FineTuningParams.ATMOS_LOSS_WEIGHT * atmos_loss / atmos_size
+            ERA5FineTuningParams.SURF_LOSS_WEIGHT * surf_loss
+            + ERA5FineTuningParams.ATMOS_LOSS_WEIGHT * atmos_loss
         )
         * ERA5FineTuningParams.ERA5_WEIGHT
         / (SURF_VARS_COUNT + ATMOS_VARS_COUNT)

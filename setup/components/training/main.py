@@ -53,7 +53,7 @@ from aurora import Aurora, Batch
 
 # NOTE: enable imports in local and remote environments
 try:
-    from setup.components.common.loss import weighted_mae
+    from common.loss import weighted_mae
     from common.utils import (
         batch_to_xarray,
         create_logger,
@@ -374,6 +374,11 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "--area_weighted",
+        type=bool,
+        help="Whether the MAE loss is area-weighted.",
+    )
+    parser.add_argument(
         "--config",
         type=json.loads,
         help="JSON string of fine-tuning configuration.",
@@ -392,11 +397,6 @@ if __name__ == "__main__":
         "--finetuned",
         type=str,
         help="Path to which the fine-tuned model state .ckpt file will be written.",
-    )
-    parser.add_argument(
-        "--area_weighted",
-        type=bool,
-        help="Whether the MAE loss is area-weighted.",
     )
     args = parser.parse_args()
 

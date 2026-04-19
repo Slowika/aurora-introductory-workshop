@@ -59,14 +59,14 @@ if __name__ == "__main__":
                     "This datetime is only possibly used as a target."
                 ),
             ),
-            "config": Input(
-                type="string",
-                description="JSON string of fine-tuning configuration.",
-            ),
             "area_weighted": Input(
                 type="boolean",
                 default=False,
                 description="Whether the MAE loss is area-weighted.",
+            ),
+            "config": Input(
+                type="string",
+                description="JSON string of fine-tuning configuration.",
             ),
         },
         outputs={
