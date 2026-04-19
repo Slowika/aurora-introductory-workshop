@@ -53,6 +53,7 @@ from aurora import Aurora, Batch
 
 # NOTE: enable imports in local and remote environments
 try:
+    from common.loss import weighted_mae
     from common.utils import (
         batch_to_xarray,
         create_logger,
@@ -61,6 +62,7 @@ try:
         validate_common_config,
     )
 except ImportError:
+    from setup.components.common.loss import weighted_mae
     from setup.components.common.utils import (
         batch_to_xarray,
         create_logger,
@@ -70,31 +72,6 @@ except ImportError:
     )
 
 LOG = create_logger()
-
-
-def mae(pred: Batch, target: Batch) -> torch.Tensor:
-    """Calculate MAE over all dynamic variables in the prediction.
-
-    Parameters
-    ----------
-    pred : aurora.Batch
-        Model prediction.
-    target : aurora.Batch
-        Target batch.
-
-    Returns
-    -------
-    total : torch.Tensor
-        Scalar MAE loss tensor.
-
-    """
-    device = next(iter(pred.surf_vars.values())).device
-    total = torch.tensor(0.0, device=device)
-    for k in pred.surf_vars:
-        total = total + (pred.surf_vars[k] - target.surf_vars[k]).abs().mean()
-    for k in pred.atmos_vars:
-        total = total + (pred.atmos_vars[k] - target.atmos_vars[k]).abs().mean()
-    return total
 
 
 def get_lora_params(model: torch.nn.Module) -> list[torch.nn.Parameter]:
@@ -178,6 +155,7 @@ def finetune_short_lead(  # noqa: PLR0913
     batch_fn: Callable[..., Batch],
     timestamps: list[datetime],
     epochs: int = 1,
+    area_weighted: bool = False,
     **_: dict,
 ) -> tuple[Batch, list[float]]:
     """Fine-tune a pre-trained Aurora model with short lead training.
@@ -196,6 +174,8 @@ def finetune_short_lead(  # noqa: PLR0913
         List of datetimes for fine-tuning data.
     epochs : int, default = 1
         Number of fine-tuning epochs.
+    area_weighted : bool, default = false
+        Whether the loss function being used is area-weighted.
 
     Returns
     -------
@@ -217,7 +197,7 @@ def finetune_short_lead(  # noqa: PLR0913
         tgt_batch = batch_fn(start_datetime=init_batch.metadata.time[0] + step, times=1)
         optimiser.zero_grad(set_to_none=True)
         pred = model.forward(init_batch)
-        loss_value = mae(pred, tgt_batch)
+        loss_value = weighted_mae(pred, tgt_batch, area_weighted=area_weighted)
         loss_value.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         optimiser.step()
@@ -235,6 +215,7 @@ def finetune_autoregressive(  # noqa: PLR0913
     timestamps: list[datetime],
     epochs: int = 1,
     rollout_steps: int = 4,
+    area_weighted: bool = False,
 ) -> tuple[Batch, list[float]]:
     """Fine-tune an Aurora model with autoregressive training.
 
@@ -257,6 +238,8 @@ def finetune_autoregressive(  # noqa: PLR0913
         Number of fine-tuning epochs.
     rollout_steps : int, default = 4
         Number of autoregressive rollout steps per epoch.
+    area_weighted : bool, default = false
+        Whether the loss function being used is area-weighted.
 
     Returns
     -------
@@ -293,7 +276,7 @@ def finetune_autoregressive(  # noqa: PLR0913
             times=1,
         )
         pred = model.forward(init_batch)
-        loss_value = mae(pred, tgt_batch)
+        loss_value = weighted_mae(pred, tgt_batch, area_weighted=area_weighted)
         loss_value.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         optimiser.step()
@@ -391,6 +374,11 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "--area_weighted",
+        type=bool,
+        help="Whether the MAE loss is area-weighted.",
+    )
+    parser.add_argument(
         "--config",
         type=json.loads,
         help="JSON string of fine-tuning configuration.",
@@ -466,6 +454,7 @@ if __name__ == "__main__":
         timestamps=timestamps,
         epochs=epochs,
         rollout_steps=args.config.get("rollout_steps", 4),
+        area_weighted=args.area_weighted
     )
     model = model.to("cpu")
     LOG.info("Completed %d fine-tuning epochs.", epochs)

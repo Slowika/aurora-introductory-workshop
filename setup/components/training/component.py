@@ -30,6 +30,7 @@ if __name__ == "__main__":
             "--loss ${{outputs.loss}} "
             "--prediction ${{outputs.prediction}} "
             "--finetuned ${{outputs.finetuned}}"
+            "--area_weighted ${{outputs.area_weighted}}"
         ),
         code="./setup/components/training/",
         # environment gets persisted in registered component
@@ -57,6 +58,11 @@ if __name__ == "__main__":
                     "End ISO 8601 format datetime e.g. 2025-01-31T23:00:00. "
                     "This datetime is only possibly used as a target."
                 ),
+            ),
+            "area_weighted": Input(
+                type="boolean",
+                default=False,
+                description="Whether the MAE loss is area-weighted.",
             ),
             "config": Input(
                 type="string",
