@@ -208,3 +208,7 @@ __marimo__/
 
 # workshop outputs
 notebooks/outputs
+
+# tests
+tests/models/
+mlflow.db

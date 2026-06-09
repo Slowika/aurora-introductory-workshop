@@ -2,14 +2,13 @@
 
 import logging
 import sys
-from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
 import torch
 import xarray as xr
-from aurora import AuroraPretrained, Batch, Metadata, normalisation
+from aurora import AuroraPretrained, Batch, Metadata
 
 try:
     from common.constants import ATMOS_VAR_MAP, STATIC_VAR_MAP, SURF_VAR_MAP
@@ -43,9 +42,9 @@ def load_model(
     *,
     train: bool,
     strict: bool = True,
-    **cfg: dict[str, Any],
+    **cfg: str,
 ) -> AuroraPretrained:
-    """Load the Aurora pre-trained model from a local checkpoint.
+    """Load an Aurora pre-trained model from a local checkpoint.
 
     Parameters
     ----------
@@ -223,83 +222,35 @@ def batch_to_xarray(batch: Batch) -> xr.Dataset:
     )
 
 
-# mapping of data modes to batch creation functions
-BATCH_FNS: dict[str, Callable[..., Batch]] = {
-    "test": make_lowres_batch,
-    "era5": load_batch_from_asset,
-}
-
-
-def validate_common_config(config: dict[str, Any]) -> Callable[..., Batch]:
-    """Validate config fields common to inference and fine-tuning.
+def get_batch_isodate(batch: Batch) -> str:
+    """Get the batch datetime in ISO 8601 format.
 
     Parameters
     ----------
-    config : dict[str, typing.Any]
-        Configuration dictionary.
+    batch : aurora.Batch
+        Batch to get the time from.
 
     Returns
     -------
-    collections.abc.Callable[..., aurora.Batch]
-        Batch creation function.
-
-    Raises
-    ------
-    KeyError
-        If 'mode' field is missing or invalid.
+    str
+        ISO 8601 format Batch datetime.
 
     """
-    try:
-        return BATCH_FNS[config["mode"]]
-    except KeyError as e:
-        msg = f"Absent or invalid 'mode' field, must be one of {BATCH_FNS.keys()}."
-        raise KeyError(msg) from e
+    return batch.metadata.time[0].isoformat(timespec="hours")
 
 
-def register_new_variables(
-    new_variables: dict[str, Any],
-) -> tuple[dict[str, dict[str, str]], dict[str, tuple[str, ...]]]:
-    """Register new variables to be added to the model and data.
+def tz_naive_datetime(date: str) -> datetime:
+    """Parse an ISO 8601 datetime string to a timezone-naive datetime object.
 
     Parameters
     ----------
-    new_variables : dict[str, Any]
-        Mapping of long variable names to their information dictionaries.
-        Information must include key : value pairs for:
-        - "kind": one of "surf_vars", "static_vars", or "atmos_vars"
-        - "key": variable shortname
-        - "location": normalisation location statistic
-        - "scale": normalisation scale statistic
+    date : str
+        ISO 8601 datetime string.
 
     Returns
     -------
-    var_map : dict[str, dict[str, str]]
-        Updated variable mappings for "surf_vars", "static_vars", and "atmos_vars"
-        variables.
-    var_cfg : dict[str, tuple[str, ...]]
-        Updated Aurora configuration variable tuples.
-
-    Raises
-    ------
-    KeyError
-        If info["kind"] is not supported, currently "surf_vars", "static_vars", or
-        "atmos_vars".
+    datetime.datetime
+        Parsed timezone-naive datetime object.
 
     """
-    var_map = {
-        "surf_vars": SURF_VAR_MAP.copy(),
-        "static_vars": STATIC_VAR_MAP.copy(),
-        "atmos_vars": ATMOS_VAR_MAP.copy(),
-    }
-    var_cfg = {}
-    for longname, info in new_variables.items():
-        try:
-            type_var_map = var_map[info["kind"]]
-        except KeyError as e:
-            msg = f"Unknown variable kind, must be one of {list(var_map.keys())}."
-            raise KeyError(msg) from e
-        type_var_map[longname] = info["key"]
-        var_cfg[info["kind"]] = tuple(type_var_map.values())
-        normalisation.locations[info["key"]] = info.get("location", 0.0)
-        normalisation.scales[info["key"]] = info.get("scale", 1.0)
-    return var_map, var_cfg
+    return datetime.fromisoformat(date).replace(tzinfo=None)

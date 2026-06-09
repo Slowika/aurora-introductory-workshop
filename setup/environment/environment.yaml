@@ -1,0 +1,9 @@
+$schema: https://azuremlschemas.azureedge.net/latest/environment.schema.json
+name: aurora_environment
+description: Environment for running inference and fine-tuning with Microsoft Aurora.
+tags:
+  project: aurora-introductory-workshop
+version: 1
+build:
+  path: .
+  dockerfile_path: Dockerfile

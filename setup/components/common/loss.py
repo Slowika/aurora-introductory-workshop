@@ -87,7 +87,7 @@ def atmos_tensor(batch: Batch) -> torch.Tensor:
     return torch.stack([batch.atmos_vars[vid] for vid in ATMOS_VARS])
 
 
-def weighted_mae(pred: Batch, target: Batch, area_weighted: bool) -> torch.Tensor:
+def weighted_mae(pred: Batch, target: Batch, *, area_weighted: bool) -> torch.Tensor:
     """Area-weighted mean absolute error, following Bodnar et al. (2025).
 
     Note: this does not currently account for new variables beyond those present in the
@@ -100,6 +100,8 @@ def weighted_mae(pred: Batch, target: Batch, area_weighted: bool) -> torch.Tenso
         Model prediction.
     target : aurora.Batch
         Ground truth.
+    area_weighted : bool
+        Whether to weight the loss by the cosine of latitude.
 
     Returns
     -------

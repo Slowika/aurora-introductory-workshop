@@ -1,6 +1,8 @@
 """Workshop setup utility functions."""
 
+import json
 import os
+from typing import overload
 
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import Component, Data, Model
@@ -20,15 +22,12 @@ def get_aml_ci_env_vars() -> tuple[str, str, str]:
     ws_name : str
         Azure ML workspace name
 
-    Raises
-    ------
-    KeyError
-        If any of the required environment variables are not set.
-
     """
-    sub_id = os.environ["MLFLOW_TRACKING_URI"].split("/")[6]
-    rg_name = os.environ["CI_RESOURCE_GROUP"]
-    ws_name = os.environ["CI_WORKSPACE"]
+    azureml_ctx = os.environ["AZUREML_CR_AZUREML_CONTEXT"]
+    azureml_ctx_dict = json.loads(azureml_ctx)
+    sub_id = azureml_ctx_dict["subscription_id"]
+    rg_name = azureml_ctx_dict["resource_group"]
+    ws_name = azureml_ctx_dict["workspace_name"]
     return sub_id, rg_name, ws_name
 
 
@@ -43,11 +42,6 @@ def get_local_env_vars() -> tuple[str, str, str]:
         Azure resource group name
     ws_name : str
         Azure ML workspace name
-
-    Raises
-    ------
-    KeyError
-        If any of the required environment variables are not set.
 
     """
     sub_id = os.environ["SUBSCRIPTION_ID"]
@@ -70,6 +64,27 @@ def create_mlclient(*, local: bool) -> MLClient:
     else:
         sub_id, rg_name, ws_name = get_aml_ci_env_vars()
     return MLClient(DefaultAzureCredential(), sub_id, rg_name, ws_name)
+
+
+@overload
+def get_latest_asset(
+    operations: ComponentOperations,
+    name: str,
+) -> Component: ...
+
+
+@overload
+def get_latest_asset(
+    operations: DataOperations,
+    name: str,
+) -> Data: ...
+
+
+@overload
+def get_latest_asset(
+    operations: ModelOperations,
+    name: str,
+) -> Model: ...
 
 
 def get_latest_asset(
