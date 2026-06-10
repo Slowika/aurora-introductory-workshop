@@ -52,8 +52,10 @@ Provided hardware is sufficient, workshop code can be run in local and remote (A
 | Location | Setting | Description | Editable |
 | --- | --- | --- | --- |
 | [setup/notebooks/load_era5_local.ipynb](setup/notebooks/load_era5_local.ipynb) / [setup/notebooks/load_era5](setup/notebooks/load_era5.ipynb) | `EXTRA_SFC_VARS`, `EXTRA_ATMOS_VARS`, `EXTRA_LEVELS` | Additional non-standard variables and levels to load | Yes |
-| [setup/components/common/constants.py](setup/components/common/constants.py) | `SURF_VAR_MAP`, `STATIC_VAR_MAP`, `ATMOS_VAR_MAP` | ERA5 longname -> Aurora shortname map for surface, static, and atmospheric variables | No, specific to expected input data and checkpoint |
+| [setup/components/common/constants.py](setup/components/common/constants.py) | `SURF_VAR_MAP`, `STATIC_VAR_MAP`, `ATMOS_VAR_MAP` | ERA5 longname -> Aurora shortname map for expected surface, static, and atmospheric variables | No, specific to expected input data and checkpoint |
 | | `ATMOS_LEVELS` | Aurora-expected pressure levels | No, specific to expected input data and checkpoint |
+
+New variables and pressure levels to fine-tune (or run inference with on a fine-tuned model) should be present in the input data and specified in the [run configuration](#run-configurations).
 
 Other Aurora variants and their checkpoints are available on [Hugging Face](https://huggingface.co/microsoft/aurora/tree/main) though many, if not all, will not work out-of-the-box with this workshop. Different models have different input data expectations and pre-configured data loading is specific to `aurora-0.25-pretrained.ckpt`. Model loading ([`setup.components.common.utils.load_model`](setup/components/common/utils.py#45)) is also specific to `AuroraPretrained`.
 
@@ -61,7 +63,7 @@ A hybrid execution model is possible in that all workspace setup (entity deploym
 
 ### Run Configurations
 
-AML job or `runpy` script executions rely on [inference](notebooks/inference_configs.yaml) and [finetuning](notebooks/finetune_configs.yaml) YAML configurations. Add new or update run configurations using the provided examples and [`pydantic` model definitions](setup/components/common/models.py) as guides.
+Both AML job and `runpy` script executions rely on YAML configurations for [inference](notebooks/inference_configs.yaml) and [finetuning](notebooks/finetune_configs.yaml). Add new or update run configurations using the provided examples and [`pydantic` model definitions](setup/components/common/models.py) as guides.
 
 ### Local
 
@@ -124,7 +126,7 @@ For SDK-based entity deployment or local execution of the data loading, model lo
 
 Tests require `pytest`.
 
-Integration tests in which inference and fine-tuning are tested end-to-end require the `aurora.AuroraSmallPretrained` checkpoint. Download it to the tests/models/ (gitignored) directory with:
+Integration tests in which inference and fine-tuning are tested require the `aurora.AuroraSmallPretrained` checkpoint. Download it to the tests/models/ (gitignored) directory with:
 ```bash
 huggingface-cli download microsoft/aurora aurora-0.25-small-pretrained.ckpt --local-dir tests/models/
 ```
