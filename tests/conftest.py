@@ -115,10 +115,9 @@ def target_batch(make_batch: Callable[[datetime], Batch]) -> Batch:
 
 
 @pytest.fixture
-def run_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[Path]:
+def run_dir(tmp_path: Path) -> Generator[Path]:
     """Temporary working directory for component outputs and MLflow tracking."""
     mlflow_uri = (tmp_path / "mlruns").as_uri()
-    monkeypatch.setenv("MLFLOW_TRACKING_URI", mlflow_uri)
     mlflow.set_tracking_uri(mlflow_uri)
     yield tmp_path
     mlflow.end_run()

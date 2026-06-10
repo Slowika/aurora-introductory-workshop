@@ -20,8 +20,13 @@ except ImportError:
     )
 
 
-def create_logger() -> logging.Logger:
+def create_logger(name: str = __name__) -> logging.Logger:
     """Create a configured logger.
+
+    Parameters
+    ----------
+    name : str, default = __name__
+        Name of the logger.
 
     Returns
     -------
@@ -34,7 +39,7 @@ def create_logger() -> logging.Logger:
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
-    return logging.getLogger(__name__)
+    return logging.getLogger(name)
 
 
 def load_model(

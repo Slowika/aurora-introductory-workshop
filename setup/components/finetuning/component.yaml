@@ -1,7 +1,7 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
 type: command
 
-name: aurora_finetuning
+name: aurora_finetuning  # if changing, sync 0_aurora_workshop.ipynb
 display_name: Aurora Finetuning
 version: 1
 description: Command component for performing fine-tuning of Microsoft Aurora.

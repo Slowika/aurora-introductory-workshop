@@ -60,9 +60,7 @@ from .utils import (
     get_lora_params,
 )
 
-LOG = create_logger()
-
-
+LOG = create_logger(__name__)
 # mapping of fine-tuning modes to functions
 FINETUNE_FNS: dict[str, Callable[..., tuple[Batch, list[float]]]] = {
     "short": finetune_short_lead,

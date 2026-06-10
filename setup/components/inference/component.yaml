@@ -1,7 +1,7 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json
 type: command
 
-name: aurora_inference
+name: aurora_inference  # if changing, sync 0_aurora_workshop.ipynb
 display_name: Aurora Inference
 version: 1
 description: >-

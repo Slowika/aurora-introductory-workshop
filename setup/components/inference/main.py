@@ -53,7 +53,8 @@ except ImportError:
         load_model,
         tz_naive_datetime,
     )
-LOG = create_logger()
+
+LOG = create_logger(__name__)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Aurora Inference")

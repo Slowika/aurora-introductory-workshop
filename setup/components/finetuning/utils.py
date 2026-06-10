@@ -19,7 +19,7 @@ except ImportError:
     from setup.components.common.loss import weighted_mae
     from setup.components.common.utils import create_logger
 
-LOG = create_logger()
+LOG = create_logger(__name__)
 
 
 def get_lora_params(model: torch.nn.Module) -> list[torch.nn.Parameter]:
