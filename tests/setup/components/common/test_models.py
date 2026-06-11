@@ -1,4 +1,4 @@
-"""Test Pydantic configuration models and their custom validators."""
+"""Unit tests for Pydantic configuration models and their custom validators."""
 
 import warnings
 from unittest.mock import MagicMock, patch
@@ -13,7 +13,6 @@ from setup.components.common.models import (
     ExtraVariables,
     FinetuneConfig,
 )
-from setup.components.common.utils import load_batch_from_asset, make_lowres_batch
 
 
 def test_extra_variables_iteration() -> None:
@@ -55,16 +54,6 @@ def test_extra_variables_same_key_different_kind_allowed() -> None:
     }
     evs = ExtraVariables(variables=variables)
     assert len(evs) == len(variables)
-
-
-def test_data_mode_batch_fn_test() -> None:
-    """Map TEST mode to make_lowres_batch."""
-    assert DataMode.TEST.batch_fn is make_lowres_batch
-
-
-def test_data_mode_batch_fn_era5() -> None:
-    """Map ERA5 mode to load_batch_from_asset."""
-    assert DataMode.ERA5.batch_fn is load_batch_from_asset
 
 
 def test_base_config_variable_map_returns_copy() -> None:

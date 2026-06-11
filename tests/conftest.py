@@ -24,6 +24,7 @@ from setup.components.common.constants import (
 mpl.use("Agg")
 CHECKPOINT_PATH = Path("tests/models/aurora-0.25-small-pretrained.ckpt")
 BASE_DATE = datetime(2025, 1, 1, tzinfo=UTC)
+N_TIMESTAMPS = 10  # sufficient no. for inference and fine-tuning
 
 requires_checkpoint = pytest.mark.skipif(
     not CHECKPOINT_PATH.exists(),
@@ -104,13 +105,13 @@ def make_batch() -> Callable[[datetime], Batch]:
 
 @pytest.fixture
 def sample_batch(make_batch: Callable[[datetime], Batch]) -> Batch:
-    """Batch at BASE_DATE."""
+    """Single timestamp Batch at BASE_DATE."""
     return make_batch(BASE_DATE)
 
 
 @pytest.fixture
 def target_batch(make_batch: Callable[[datetime], Batch]) -> Batch:
-    """Batch at BASE_DATE + 6h, for use as ground-truth target."""
+    """Single timestamp Batch at BASE_DATE + 6h, for use as ground-truth target."""
     return make_batch(BASE_DATE + timedelta(hours=6))
 
 
@@ -135,35 +136,34 @@ def use_small_model() -> Generator[None]:
 
 @pytest.fixture(scope="session")
 def era5_dataset(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Write a minimal ERA5-schema zarr with real Aurora variable names."""
+    """Write a minimal GCP ERA5-schema Zarr."""
     zarr_path = tmp_path_factory.mktemp("data") / "era5.zarr"
     # 16:32 matches make_lowres_batch, min for Aurora
     lats = torch.linspace(90, -90, 16).numpy()
     lons = torch.linspace(0, 360, 32 + 1)[:-1].numpy()
     n_lat = len(lats)
     n_lon = len(lons)
-    n_timestamps = 10  # sufficient no. for inference and fine-tuning
     times = pd.date_range(
         BASE_DATE.replace(tzinfo=None) - timedelta(hours=6),
-        periods=n_timestamps,
+        periods=N_TIMESTAMPS,
         freq="6h",
     )
     surf_vars = {
         k: (
             ("time", "latitude", "longitude"),
-            torch.randn(n_timestamps, n_lat, n_lon).numpy(),
+            torch.randn(N_TIMESTAMPS, n_lat, n_lon).numpy(),
         ) for k in SURF_VAR_MAP
     }
     static_vars = {
         k: (
             ("time", "latitude", "longitude"),
-            torch.randn(n_timestamps, n_lat, n_lon).numpy(),
+            torch.randn(N_TIMESTAMPS, n_lat, n_lon).numpy(),
         ) for k in STATIC_VAR_MAP
     }
     atmos_vars = {
         k: (
             ("time", "level", "latitude", "longitude"),
-            torch.randn(n_timestamps, len(ATMOS_LEVELS), n_lat, n_lon).numpy(),
+            torch.randn(N_TIMESTAMPS, len(ATMOS_LEVELS), n_lat, n_lon).numpy(),
         ) for k in ATMOS_VAR_MAP
     }
     ds = xr.Dataset(

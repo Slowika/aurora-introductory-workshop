@@ -6,12 +6,8 @@ NetCDF file at the specified output path. The final prediction is evaluated agai
 ground-truth data and relevant metrics and figures are logged with MLflow.
 
 Running locally:
-    `python -m setup.components.inference.main \
-    --model <path to local model checkpoint e.g. ./aurora-0.25-pretrained.ckpt> \
-    --data <path to local initial state data e.g. ./era5_subset.zarr> \
-    --start_datetime <ISO 8601 format datetime e.g. 2026-01-01T00:00:00> \
-    --config <JSON-formatted string of inference configuration> \
-    --predictions <path to output NetCDF file of forecasts e.g. ./fcst.nc>`
+    See notebooks/0_aurora_workshop_local.ipynb for example usage or run:
+    `python -m setup.components.inference.main -h`
 
 Running in Azure Machine Learning:
     See setup/components/inference/component.yaml for definition and

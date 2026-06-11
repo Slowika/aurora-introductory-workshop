@@ -6,15 +6,8 @@ forecast made, and the fine-tuned model checkpoint are written to the specified 
 paths.
 
 Running locally:
-    `python -m setup.components.finetuning.main \
-    --model <path to local model checkpoint e.g. ./aurora-0.25-pretrained.ckpt> \
-    --data <path to local initial state data e.g. ./era5_subset.zarr, optional> \
-    --start_datetime <ISO 8601 format start datetime e.g. 2026-01-01T00:00:00> \
-    --end_datetime <ISO 8601 format end datetime e.g. 2026-01-01T00:00:00> \
-    --config <JSON-serialised string of fine-tuning configuration> \
-    --loss <path to output loss history NumPy file e.g. ./losses.npy> \
-    --prediction <path to output NetCDF of the final prediction e.g. ./fcst.nc> \
-    --checkpoint <path to output fine-tuned model checkpoint e.g. ./finetuned.ckpt>`
+    See notebooks/0_aurora_workshop_local.ipynb for example usage or run:
+    `python -m setup.components.finetuning.main -h`
 
 Running in Azure Machine Learning:
     See setup/components/finetuning/component.yaml for definition and
@@ -124,10 +117,6 @@ if __name__ == "__main__":
     cfg: FinetuneConfig = args.config
     LOG.info("Starting fine-tuning run with config: %s", cfg.model_dump())
 
-    if not (finetune_fn := FINETUNE_FNS.get(cfg.type)):
-        msg = f"Invalid value for 'type', must be one of {list(FINETUNE_FNS)}."
-        raise KeyError(msg)
-
     LOG.info("Loading model: path=%s", args.model)
     strict = not (lora := cfg.aurora_config.use_lora) and (cfg.extra_variables is None)
     model = load_model(args.model, train=True, strict=strict, **cfg.aurora_init_kwargs)
@@ -145,7 +134,7 @@ if __name__ == "__main__":
         cfg.epochs,
     )
     timestamps = get_datetime_range(args.start_datetime, args.end_datetime)
-    prediction, loss_history = finetune_fn(
+    prediction, loss_history = FINETUNE_FNS[cfg.type](
         model=model,
         params=params,
         optimiser=optimiser,

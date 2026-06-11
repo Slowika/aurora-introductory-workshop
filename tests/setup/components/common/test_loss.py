@@ -1,4 +1,4 @@
-"""Test loss functions and tensor extraction utilities."""
+"""Unit tests for loss functions and tensor extraction utilities."""
 
 import torch
 from aurora import Batch
