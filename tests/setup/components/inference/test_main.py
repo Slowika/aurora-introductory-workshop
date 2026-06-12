@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 import xarray as xr
 
+from setup.common.constants import INFERENCE_MODULE
 from setup.components.common.models import DataMode, InferenceConfig
 from tests.conftest import (
     BASE_DATE,
@@ -44,11 +45,7 @@ def _run_inference(
         "--config", cfg.model_dump_json(),
         "--predictions", str(output_path),
     ]
-    runpy.run_module(
-        "setup.components.inference.main",
-        run_name="__main__",
-        alter_sys=True,
-    )
+    runpy.run_module(INFERENCE_MODULE, run_name="__main__", alter_sys=True)
 
 
 @requires_checkpoint

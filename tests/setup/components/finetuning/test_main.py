@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 import xarray as xr
 
+from setup.common.constants import FINETUNE_MODULE
 from setup.components.common.models import AuroraConfig, DataMode, FinetuneConfig
 from tests.conftest import (
     BASE_DATE,
@@ -54,11 +55,7 @@ def _run_finetuning(  # noqa: PLR0913
         "--prediction", str(prediction_path),
         "--checkpoint", str(checkpoint_path),
     ]
-    runpy.run_module(
-        "setup.components.finetuning.main",
-        run_name="__main__",
-        alter_sys=True,
-    )
+    runpy.run_module(FINETUNE_MODULE, run_name="__main__", alter_sys=True)
 
 
 def _output_paths(run_dir: Path) -> tuple[Path, Path, Path]:

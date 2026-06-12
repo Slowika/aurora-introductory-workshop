@@ -123,9 +123,9 @@ def weighted_mae(pred: Batch, target: Batch, *, area_weighted: bool) -> torch.Te
         lat = torch.as_tensor(target.metadata.lat)
         area_w = torch.cos(torch.deg2rad(lat))
     else:
-        area_w = torch.ones(h, device=device, dtype=dtype)
+        area_w = torch.ones(h, dtype=dtype)
     # normalise area weights
-    area_w = area_w / torch.sum(area_w)
+    area_w = (area_w / torch.sum(area_w)).to(device)
 
     # reshape weights
     surf_w = area_w.view(1, 1, 1, h, 1)
@@ -135,8 +135,8 @@ def weighted_mae(pred: Batch, target: Batch, *, area_weighted: bool) -> torch.Te
     surf_abs_err = torch.abs(surf_preds - surf_targets) * surf_w
     atmos_abs_err = torch.abs(atmos_preds - atmos_targets) * atmos_w
 
-    surf_loss = (surf_var_weights * surf_abs_err).sum()
-    atmos_loss = (atmos_var_weights * atmos_abs_err).sum()
+    surf_loss = (surf_var_weights.to(device) * surf_abs_err).sum()
+    atmos_loss = (atmos_var_weights.to(device) * atmos_abs_err).sum()
 
     # total loss
     return (

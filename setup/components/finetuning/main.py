@@ -37,6 +37,12 @@ try:
         load_model,
         tz_naive_datetime,
     )
+    from utils import (
+        finetune_autoregressive,
+        finetune_short_lead,
+        get_datetime_range,
+        get_lora_params,
+    )
 except ImportError:
     from setup.components.common.models import FinetuneConfig
     from setup.components.common.utils import (
@@ -45,13 +51,12 @@ except ImportError:
         load_model,
         tz_naive_datetime,
     )
-
-from .utils import (
-    finetune_autoregressive,
-    finetune_short_lead,
-    get_datetime_range,
-    get_lora_params,
-)
+    from setup.components.finetuning.utils import (
+        finetune_autoregressive,
+        finetune_short_lead,
+        get_datetime_range,
+        get_lora_params,
+    )
 
 LOG = create_logger(__name__)
 # mapping of fine-tuning modes to functions

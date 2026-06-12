@@ -5,5 +5,7 @@ tags:
   project: aurora-introductory-workshop
 version: 1
 build:
-  path: .
-  dockerfile_path: Dockerfile
+  # set to project root for access to pyproject.toml
+  # uploads non-gitignored project files, .dockerignore filters for build
+  path: ../../
+  dockerfile_path: setup/environment/Dockerfile

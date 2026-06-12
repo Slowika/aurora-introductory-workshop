@@ -67,7 +67,7 @@ Both AML job and `runpy` script executions rely on YAML configurations for [infe
 
 ### Local
 
-These instructions describe completely local execution of inference and fine-tuning. To do so, capable hardware is required. Inference can run on CPU, albeit slowly. Fine-tuning of the full Aurora 0.25 degree pre-trained model as in this workshop requires an A100, H100, or equivalent GPU. Also required is sufficient storage to load the model and data. The [`uv`](https://docs.astral.sh/uv/) package manager is the easiest way to get started.
+These instructions describe completely local execution of inference and fine-tuning, though also apply to execution on an AML compute instance in the Notebooks tab as opposed to submitted jobs. To do so, capable hardware is required. Inference can run on CPU, albeit slowly. Fine-tuning of the full Aurora 0.25 degree pre-trained model as in this workshop requires an A100, H100, or equivalent GPU. Also required is sufficient storage to load the model and data. The [`uv`](https://docs.astral.sh/uv/) package manager is the easiest way to get started.
 
 1. Create a Python virtual environment at the repository root and install dependencies (optionally including the `dev` group for tests)
 2. Run the [data](setup/notebooks/load_era5_local.ipynb) and [model](setup/notebooks/load_model.ipynb) loading Jupyter notebooks in [setup/notebooks](setup/notebooks/) using the virtual environment as the kernel, skipping the final cell of the latter notebook to avoid remote registration of the model asset

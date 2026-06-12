@@ -1,4 +1,9 @@
-"""Utility functions for fine-tuning Microsoft Aurora."""
+"""Utility functions for fine-tuning Microsoft Aurora.
+
+In practice, each epoch would be a full pass over the entire dataset. For workshop
+purposes (faster execution), we use one batch for a randomly selected timestamp per
+epoch. Said timestamp is then excluded from use in subsequent epochs.
+"""
 
 import dataclasses
 from collections.abc import Callable

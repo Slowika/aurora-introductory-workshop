@@ -19,6 +19,8 @@ except ImportError:
         SURF_VAR_MAP,
     )
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def create_logger(name: str = __name__) -> logging.Logger:
     """Create a configured logger.
@@ -73,7 +75,7 @@ def load_model(
     model.load_checkpoint_local(model_path, strict)
     if train and hasattr(model, "configure_activation_checkpointing"):
         model.configure_activation_checkpointing()
-    return model.to("cuda").train(mode=train)
+    return model.to(DEVICE).train(mode=train)
 
 
 def make_lowres_batch(
@@ -107,13 +109,13 @@ def make_lowres_batch(
     """
     return Batch(
         surf_vars={
-            k: torch.randn(1, times, 16, 32, device="cuda") for k in surf_vars.values()
+            k: torch.randn(1, times, 16, 32, device=DEVICE) for k in surf_vars.values()
         },
         static_vars={
-            k: torch.randn(16, 32, device="cuda") for k in static_vars.values()
+            k: torch.randn(16, 32, device=DEVICE) for k in static_vars.values()
         },
         atmos_vars={
-            k: torch.randn(1, times, 4, 16, 32, device="cuda")
+            k: torch.randn(1, times, 4, 16, 32, device=DEVICE)
             for k in atmos_vars.values()
         },
         metadata=Metadata(
@@ -164,22 +166,22 @@ def load_batch_from_asset(  # noqa: PLR0913
     return Batch(
         # produces Tensors of shape [1, times, 720, lons]
         surf_vars={
-            v: torch.from_numpy(ds_sel[k].values[:, :720, :]).unsqueeze(0).to("cuda")
+            v: torch.from_numpy(ds_sel[k].values[:, :720, :]).unsqueeze(0).to(DEVICE)
             for k, v in surf_vars.items()
         },
         # produces Tensors of shape [720, lons]
         static_vars={
-            v: torch.from_numpy(ds_sel[k].isel(time=-1).values[:720, :]).to("cuda")
+            v: torch.from_numpy(ds_sel[k].isel(time=-1).values[:720, :]).to(DEVICE)
             for k, v in static_vars.items()
         },
         # produces Tensors of shape [1, times, levels, 720, lons]
         atmos_vars={
-            v: torch.from_numpy(ds_sel[k].values[:, :, :720, :]).unsqueeze(0).to("cuda")
+            v: torch.from_numpy(ds_sel[k].values[:, :, :720, :]).unsqueeze(0).to(DEVICE)
             for k, v in atmos_vars.items()
         },
         metadata=Metadata(
-            lat=torch.from_numpy(ds_sel["latitude"].values[:720]).to("cuda"),
-            lon=torch.from_numpy(ds_sel["longitude"].values).to("cuda"),
+            lat=torch.from_numpy(ds_sel["latitude"].values[:720]).to(DEVICE),
+            lon=torch.from_numpy(ds_sel["longitude"].values).to(DEVICE),
             time=(start_datetime,),
             atmos_levels=ds_sel["level"].values.tolist(),
         ),

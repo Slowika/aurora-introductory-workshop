@@ -9,6 +9,10 @@ _ROOT_DIR = Path(__file__).parents[2]
 HF_REPOSITORY = "microsoft/aurora"
 MODEL_FILENAME = "aurora-0.25-pretrained.ckpt"
 
+# DO NOT EDIT - modules to run in tests and local execution
+INFERENCE_MODULE = "setup.components.inference.main"
+FINETUNE_MODULE = "setup.components.finetuning.main"
+
 # config files
 INFERENCE_CONFIG_PATH = _ROOT_DIR / "notebooks/inference_configs.yaml"
 FINETUNE_CONFIG_PATH = _ROOT_DIR / "notebooks/finetune_configs.yaml"
