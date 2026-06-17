@@ -1,6 +1,3 @@
-# settings for Aurora should be passed under the aurora_config key
-# see aurora.model.aurora.Aurora for all valid Aurora keyword arguments
-
 test_short_lead:
   type: short
   mode: test
@@ -81,7 +78,5 @@ era5_add_variable:
     2m_dewpoint_temperature:
       kind: surf_vars
       key: d2m
-      # use real normalisation stats if possible
-      # not providing can lead to unstable training
-      location: 273.4723  # mean 2025-01 (median also works)
-      scale: 19.165396  # stdev 2025-01
+      location: 273.4723
+      scale: 19.165396

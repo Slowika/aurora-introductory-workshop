@@ -1,6 +1,14 @@
 # Aurora Introductory Workshop
 
-This repository comprises resources for the [Aurora](https://github.com/microsoft/aurora) fine-tuning on [Azure Machine Learning (AML)](https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning?view=azureml-api-2) workshop.
+This repository comprises resources for the [Aurora](https://microsoft.github.io/aurora/intro.html) inference and fine-tuning on [Azure Machine Learning (AML)](https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning?view=azureml-api-2) workshop. For the `microsoft-aurora` Python library, see the [GitHub repository](https://github.com/microsoft/aurora).
+
+At present, the following limitations apply to workshop code:
+
+- Compatible only with [Aurora 0.25° Pretrained](https://microsoft.github.io/aurora/models.html#aurora-0-25-pretrained)
+- Fine-tuning is limited to:
+    - New time periods with the [pre-trained variables and pressure levels](https://microsoft.github.io/aurora/models.html#recommended-use)
+    - Addition of new single-level variables - accepting new atmospheric variables requires modification of [new variable configuration](setup/components/common/models.py#38) to reflect registration of normalisation statistics with `aurora.normalisation`.
+    - For faster execution, epochs do not comprise a full pass over the entire training dataset but a single randomly selected subset excluded from use in subsequent epochs
 
 ## Repository structure
 
@@ -64,6 +72,55 @@ A hybrid execution model is possible in that all workspace setup (entity deploym
 ### Run Configurations
 
 Both AML job and `runpy` script executions rely on YAML configurations for [inference](notebooks/inference_configs.yaml) and [finetuning](notebooks/finetune_configs.yaml). Add new or update run configurations using the provided examples and [`pydantic` model definitions](setup/components/common/models.py) as guides.
+
+#### Inference
+
+Inference configurations define how to run inference jobs. When running the standard Aurora 0.25° Pretrained, only a configuration name and the `steps` and `mode` fields are required.
+
+```yaml
+inference_job:  # configuration name
+  steps: 4  # number of six-hour autoregressive rollout steps to predict, minimum 1
+  mode: test | era5  # type of initial state data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
+  # [OPTIONAL] keyword arguments to use in loading the model checkpoint
+  # see aurora.model.aurora.Aurora for all Aurora keyword arguments
+  # and setup.components.common.models.AuroraConfig for those currently supported here
+  aurora_config:
+    use_lora: true  # required if running a fine-tuned model trained with LoRA
+  # [OPTIONAL] non-standard variables to predict, must be present in the data and expected by a fine-tuned model
+  extra_variables:
+    2m_dewpoint_temperature:  # variable name in the initial state data
+      kind: surf_vars  # Aurora-recognised variable kind
+      key: d2m  # variable shortname key the fine-tuned model learned under
+```
+
+#### Fine-tuning
+
+Fine-tuning configurations define how to run training jobs.
+
+```yaml
+finetune_job:  # configuration name
+  type: short | rollout  # type of training, "short" for short-lead (single six-hour step), "rollout" for autoregressive
+  mode: test | era5  # type of training data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
+  epochs: 5  # number of training epochs to perform
+  rollout_steps: 4  # number of six-hour autoregressive rollout steps per epoch, ignored if type is "short", required if type is "rollout"
+  learning_rate: 3e-5  # standard, stable value commonly used for fine-tuning pre-trained transformers
+  # [OPTIONAL] keyword arguments to use in loading the model checkpoint
+  # see aurora.model.aurora.Aurora for all Aurora keyword arguments
+  # and setup.components.common.models.AuroraConfig for those currently supported here
+  aurora_config:
+    use_lora: true
+    lora_mode: single
+    lora_steps: 40
+    autocast: true
+  # [OPTIONAL] new variables to fine-tune on, must be present in the data
+  extra_variables:
+    2m_dewpoint_temperature:  # variable name in the training data
+      kind: surf_vars  # currently only supports fine-tuning of new single-level variables
+      key: d2m  # variable shortname key for Aurora to learn under
+      # if possible, use real normalisation statistics for more stable training
+      location: 0.0  # mean (or median) of the variable across the pre-loaded data
+      scale: 1.0  # standard deviation of the variable across the pre-loaded data
+```
 
 ### Local
 

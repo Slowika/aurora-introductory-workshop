@@ -7,6 +7,7 @@ from typing import overload
 from azure.ai.ml import MLClient
 from azure.ai.ml.entities import Component, Data, Model
 from azure.ai.ml.operations import ComponentOperations, DataOperations, ModelOperations
+from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import DefaultAzureCredential
 
 
@@ -107,5 +108,14 @@ def get_latest_asset(
         azure.ai.ml.entities.Model
         Latest version of the asset.
 
+    Raises
+    ------
+    azure.core.exceptions.ResourceNotFoundError
+        If no asset is found with the given name.
+
     """
-    return next(iter(operations.list(name=name)))
+    try:
+        return next(iter(operations.list(name=name)))
+    except StopIteration as e:
+        msg = f"Asset not found: name={name}, type={operations.__class__.__name__}"
+        raise ResourceNotFoundError(msg) from e
