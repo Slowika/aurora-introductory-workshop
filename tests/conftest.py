@@ -77,7 +77,7 @@ def make_batch() -> Callable[[datetime], Batch]:
     """Minimal CPU batch for a given datetime factory."""
 
     def _make(time: datetime = BASE_DATE) -> Batch:
-        levels = (500, 700, 850)
+        levels = (500, 700, 850)  # aurora.Metadata expects tuple[int, ...] for levels
         lats = torch.linspace(90, -90, 4)
         lons = torch.linspace(0, 360, 8 + 1)[:-1]
         return Batch(

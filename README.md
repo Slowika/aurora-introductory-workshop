@@ -106,7 +106,7 @@ When running the standard Aurora 0.25° Pretrained, only a configuration name an
 ```yaml
 inference_job:  # configuration name
   steps: 4  # number of six-hour autoregressive rollout steps to predict, minimum 1
-  mode: # type of initial state data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
+  mode: test # type of initial state data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
   # [OPTIONAL] keyword arguments to use in loading the model checkpoint
   # see aurora.model.aurora.Aurora for all Aurora keyword arguments
   # and setup.components.common.models.AuroraConfig for those currently supported here
@@ -125,8 +125,8 @@ Fine-tuning configurations define how to run training jobs.
 
 ```yaml
 finetune_job:  # configuration name
-  type: # type of training, "short" for short-lead (single six-hour step), "rollout" for autoregressive
-  mode: # type of training data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
+  type: short # type of training, "short" for short-lead (single six-hour step), "rollout" for autoregressive
+  mode: test # type of training data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
   epochs: 5  # number of training epochs to perform
   rollout_steps: 4  # number of six-hour autoregressive rollout steps per epoch, ignored if type is "short", required if type is "rollout"
   learning_rate: 3e-5  # standard, stable value commonly used for fine-tuning pre-trained transformers
