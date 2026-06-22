@@ -1,7 +1,0 @@
-{
-    "yaml.schemas": {
-        "https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json": [
-            "setup/components/*/component.yaml"
-        ]
-    }
-}

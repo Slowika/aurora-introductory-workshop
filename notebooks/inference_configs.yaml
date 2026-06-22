@@ -1,3 +1,5 @@
+# inference job configuration, see README.md for details
+
 test:
   steps: 4
   mode: test

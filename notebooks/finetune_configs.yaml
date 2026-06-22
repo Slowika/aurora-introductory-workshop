@@ -1,3 +1,5 @@
+# fine-tuning job configuration, see README.md for details
+
 test_short_lead:
   type: short
   mode: test

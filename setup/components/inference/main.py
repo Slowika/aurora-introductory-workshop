@@ -20,6 +20,7 @@ model definition in `setup.components.common.models.InferenceConfig`.
 """
 
 import argparse
+from typing import TYPE_CHECKING, cast
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -27,6 +28,9 @@ import mlflow
 import torch
 import xarray as xr
 from aurora import rollout
+
+if TYPE_CHECKING:
+    from cartopy.mpl.geoaxes import GeoAxes
 
 # NOTE: enable imports in local and remote environments
 # alternatively, use sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -163,10 +167,11 @@ if __name__ == "__main__":
         diff_t = (prediction_t - target_t).squeeze().cpu().numpy()
         fig = plt.figure(figsize=(40, 50))
         ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+        ax = cast("GeoAxes", ax)
         extent = (-180., 180., -90., 90.)
-        ax.set_extent(extents=extent)  # type: ignore[attr-defined]
-        ax.coastlines()  # type: ignore[attr-defined]
-        ax.gridlines(draw_labels=True)  # type: ignore[attr-defined]
+        ax.set_extent(extents=extent)
+        ax.coastlines()
+        ax.gridlines(draw_labels=True)
         im = ax.imshow(
             diff_t,
             origin="upper",

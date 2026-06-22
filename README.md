@@ -1,12 +1,13 @@
 # Aurora Introductory Workshop
 
-This repository comprises resources for the [Aurora](https://microsoft.github.io/aurora/intro.html) inference and fine-tuning on [Azure Machine Learning (AML)](https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning?view=azureml-api-2) workshop. For the `microsoft-aurora` Python library, see the [GitHub repository](https://github.com/microsoft/aurora).
+This repository comprises resources for the [Aurora](https://microsoft.github.io/aurora/intro.html) inference and fine-tuning on [Azure Machine Learning (AML)](https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning?view=azureml-api-2) workshop.
+For the `microsoft-aurora` Python library, see the [GitHub repository](https://github.com/microsoft/aurora).
 
 At present, the following limitations apply to workshop code:
 
 - Compatible only with [Aurora 0.25° Pretrained](https://microsoft.github.io/aurora/models.html#aurora-0-25-pretrained)
 - Fine-tuning is limited to:
-    - New time periods with the [pre-trained variables and pressure levels](https://microsoft.github.io/aurora/models.html#recommended-use)
+    - New time periods outside of the pre-trained 1979-2020 period with the [pre-trained variables and pressure levels](https://microsoft.github.io/aurora/models.html#recommended-use)
     - Addition of new single-level variables - accepting new atmospheric variables requires modification of [new variable configuration](setup/components/common/models.py#38) to reflect registration of normalisation statistics with `aurora.normalisation`.
     - For faster execution, epochs do not comprise a full pass over the entire training dataset but a single randomly selected subset excluded from use in subsequent epochs
 
@@ -47,15 +48,19 @@ Three environment variables are required for local use (SDK-based AML entity dep
 - `RESOURCE_GROUP_NAME`: name of the resource group in which resources exist
 - `WORKSPACE_NAME`: name of the Azure Machine Learning workspace to use
 
-These can be set permanently via .bashrc or the Windows environment variable manager or temporarily through a .env file. See [.template.env](.template.env) for instructions. Enable VSCode's `python.terminal.useEnvFile` setting to inject values into terminals or your preferred method for exposing project values as environment variables (e.g. `dotenv`).
+These can be set permanently via .bashrc or the Windows environment variable manager or temporarily through a .env file.
+See [.template.env](.template.env) for instructions.
 
-Three environment variables are required for remote use but are automatically set in Azure Machine Learning compute instances:
+One environment variable is required for remote use but is automatically set in Azure Machine Learning compute instances:
 
-- `AZUREML_CR_AZUREML_CONTEXT`: used to obtain the ID of the subscription, name of the resource group, and name of the AML workspace in which resources exist and jobs should be run
+- `AZUREML_CR_AZUREML_CONTEXT`: a JSON-serialised string containing, among other values, the ID of the subscription, name of the resource group, and name of the AML workspace in which resources exist and jobs should be run
 
 ## Setup and Usage
 
-Provided hardware is sufficient, workshop code can be run in local and remote (AML) environments. Key project settings are described in [setup/common/constants.py](setup/common/constants.py) - **do not edit** those marked as such. For settings not marked as non-editable, it's recommended to amend these in-place to propagate changes across workshop resources. Other settings found elsewhere include:
+Provided hardware is sufficient, workshop code can be run in local and remote (AML) environments.
+Key project settings are described in [setup/common/constants.py](setup/common/constants.py) - **do not edit** those marked as such.
+For settings not marked as non-editable, it's recommended to amend these in-place to propagate changes across workshop resources.
+Other settings found elsewhere include:
 
 | Location | Setting | Description | Editable |
 | --- | --- | --- | --- |
@@ -65,22 +70,43 @@ Provided hardware is sufficient, workshop code can be run in local and remote (A
 
 New variables and pressure levels to fine-tune (or run inference with on a fine-tuned model) should be present in the input data and specified in the [run configuration](#run-configurations).
 
-Other Aurora variants and their checkpoints are available on [Hugging Face](https://huggingface.co/microsoft/aurora/tree/main) though many, if not all, will not work out-of-the-box with this workshop. Different models have different input data expectations and pre-configured data loading is specific to `aurora-0.25-pretrained.ckpt`. Model loading ([`setup.components.common.utils.load_model`](setup/components/common/utils.py#45)) is also specific to `AuroraPretrained`.
+Other Aurora variants and their checkpoints are available on [Hugging Face](https://huggingface.co/microsoft/aurora/tree/main) though many, if not all, will not work out-of-the-box with this workshop.
+Different models have different input data expectations and pre-configured data loading is specific to `aurora-0.25-pretrained.ckpt`.
+Model loading ([`setup.components.common.utils.load_model`](setup/components/common/utils.py#45)) is also specific to `AuroraPretrained`.
 
 A hybrid execution model is possible in that all workspace setup (entity deployment and asset creation) and job submission can be run locally with the jobs themselves executed in AML.
 
+## VS Code setup
+
+Some YAML linters may validate AML command component YAML definitions against the incorrect schema, like that of pipeline components.
+To resolve this in VS Code, create .vscode/settings.json and paste:
+
+```json
+{
+    "yaml.schemas": {
+        "https://azuremlschemas.azureedge.net/latest/commandComponent.schema.json": [
+            "setup/components/*/component.yaml"
+        ]
+    }
+}
+```
+
+To use .env defined environment variables automatically, enable VSCode's `python.terminal.useEnvFile` setting to inject values into terminals or your preferred method for exposing project values as environment variables (e.g. `dotenv`).
+
 ### Run Configurations
 
-Both AML job and `runpy` script executions rely on YAML configurations for [inference](notebooks/inference_configs.yaml) and [finetuning](notebooks/finetune_configs.yaml). Add new or update run configurations using the provided examples and [`pydantic` model definitions](setup/components/common/models.py) as guides.
+Both AML job and `runpy` script executions rely on YAML configurations for [inference](notebooks/inference_configs.yaml) and [finetuning](notebooks/finetune_configs.yaml).
+Add new or update run configurations using the provided examples and [`pydantic` model definitions](setup/components/common/models.py) as guides.
 
 #### Inference
 
-Inference configurations define how to run inference jobs. When running the standard Aurora 0.25° Pretrained, only a configuration name and the `steps` and `mode` fields are required.
+Inference configurations define how to run inference jobs.
+When running the standard Aurora 0.25° Pretrained, only a configuration name and the `steps` and `mode` fields are required.
 
 ```yaml
 inference_job:  # configuration name
   steps: 4  # number of six-hour autoregressive rollout steps to predict, minimum 1
-  mode: test | era5  # type of initial state data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
+  mode: # type of initial state data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
   # [OPTIONAL] keyword arguments to use in loading the model checkpoint
   # see aurora.model.aurora.Aurora for all Aurora keyword arguments
   # and setup.components.common.models.AuroraConfig for those currently supported here
@@ -99,8 +125,8 @@ Fine-tuning configurations define how to run training jobs.
 
 ```yaml
 finetune_job:  # configuration name
-  type: short | rollout  # type of training, "short" for short-lead (single six-hour step), "rollout" for autoregressive
-  mode: test | era5  # type of training data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
+  type: # type of training, "short" for short-lead (single six-hour step), "rollout" for autoregressive
+  mode: # type of training data, "test" for low resolution synthetic data, "era5" for pre-loaded ERA5
   epochs: 5  # number of training epochs to perform
   rollout_steps: 4  # number of six-hour autoregressive rollout steps per epoch, ignored if type is "short", required if type is "rollout"
   learning_rate: 3e-5  # standard, stable value commonly used for fine-tuning pre-trained transformers
@@ -124,7 +150,11 @@ finetune_job:  # configuration name
 
 ### Local
 
-These instructions describe completely local execution of inference and fine-tuning, though also apply to execution on an AML compute instance in the Notebooks tab as opposed to submitted jobs. To do so, capable hardware is required. Inference can run on CPU, albeit slowly. Fine-tuning of the full Aurora 0.25 degree pre-trained model as in this workshop requires an A100, H100, or equivalent GPU. Also required is sufficient storage to load the model and data. The [`uv`](https://docs.astral.sh/uv/) package manager is the easiest way to get started.
+These instructions describe completely local execution of inference and fine-tuning, though also apply to execution on an AML compute instance in the Notebooks tab as opposed to submitted jobs.
+To do so, capable hardware is required.
+Inference can run on CPU, albeit slowly.
+Fine-tuning of the full Aurora 0.25 degree pre-trained model as in this workshop requires an A100, H100, or equivalent GPU.
+Also required is sufficient storage to load the model and data.
 
 1. Create a Python virtual environment at the repository root and install dependencies (optionally including the `dev` group for tests)
 2. Run the [data](setup/notebooks/load_era5_local.ipynb) and [model](setup/notebooks/load_model.ipynb) loading Jupyter notebooks in [setup/notebooks](setup/notebooks/) using the virtual environment as the kernel, skipping the final cell of the latter notebook to avoid remote registration of the model asset
@@ -132,7 +162,8 @@ These instructions describe completely local execution of inference and fine-tun
 
 ### Remote (AML)
 
-These instructions describe completely remote (AML) execution of inference and fine-tuning with deployment of some assets from a local environment. As [above](#locally), GPU-enabled compute is required for fine-tuning.
+These instructions describe completely remote (AML) execution of inference and fine-tuning with deployment of some assets from a local environment.
+As [above](#locally), GPU-enabled compute is required for fine-tuning.
 
 For SDK-based entity deployment or local execution of the data loading, model loading, or workshop notebooks, set [environment variables](#environment-variables).
 
@@ -176,14 +207,17 @@ For SDK-based entity deployment or local execution of the data loading, model lo
         ```
 3. Run inference and fine-tuning with [notebooks/0_aurora_workshop.ipynb](notebooks/0_aurora_workshop.ipynb):
     - Can be run locally (with [environment variables](#environment-variables) set) or via the AML Studio UI Notebooks tab, the latter with the pre-built `Python 3.10 - SDK v2` kernel
-    - Target compute is selected in the fourth code cell with `CLUSTER_NAME = next(iter(ml_client.compute.list(compute_type="amlcompute"))).name`. This assumes the target is a compute cluster, of which there is just one in the workspace. While this was true for the workshop instance, should this not be the case or you wish to select compute (instance or cluster) by name, replace with `CLUSTER_NAME = ml_client.compute.get({compute_name}).name`, where {compute_name} is the name of the compute to run inference and / or fine-tuning on.
+    - Target compute is selected in the fourth code cell with `CLUSTER_NAME = next(iter(ml_client.compute.list(compute_type="amlcompute"))).name`.
+    This assumes the target is a compute cluster, of which there is just one in the workspace.
+    While this was true for the workshop instance, should this not be the case or you wish to select compute (instance or cluster) by name, replace with `CLUSTER_NAME = ml_client.compute.get({compute_name}).name`, where {compute_name} is the name of the compute to run inference and / or fine-tuning on.
     - **Do not** alter any notebook values other than the aforementioned (if necessary), use input boxes that appear where prompted to specify a participant ID and job configurations - carefully read each cell's markdown description
 
 ## Testing
 
 Tests require `pytest`.
 
-Integration tests in which inference and fine-tuning are tested require the `aurora.AuroraSmallPretrained` checkpoint. Download it to the tests/models/ (gitignored) directory with:
+Integration tests in which inference and fine-tuning are tested require the `aurora.AuroraSmallPretrained` checkpoint.
+Download it to the tests/models/ (gitignored) directory with:
 ```bash
 huggingface-cli download microsoft/aurora aurora-0.25-small-pretrained.ckpt --local-dir tests/models/
 ```

@@ -1,4 +1,4 @@
-"""Shared test fixtures."""
+"""Shared test fixtures automatically used in tests in this directory and below."""
 
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime, timedelta
@@ -138,7 +138,8 @@ def use_small_model() -> Generator[None]:
 def era5_dataset(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Write a minimal GCP ERA5-schema Zarr."""
     zarr_path = tmp_path_factory.mktemp("data") / "era5.zarr"
-    # 16:32 matches make_lowres_batch, min for Aurora
+    # 16 lats x 32 lons, the mininum size accepted by Aurora
+    # matches setup.components.common.utils.make_lowres_batch
     lats = torch.linspace(90, -90, 16).numpy()
     lons = torch.linspace(0, 360, 32 + 1)[:-1].numpy()
     n_lat = len(lats)

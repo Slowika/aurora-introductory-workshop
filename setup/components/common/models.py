@@ -1,6 +1,7 @@
 """Pydantic models for inference and fine-tuning job configurations.
 
-Located here for better availability across notebooks and components.
+Located here for better availability across notebooks and components. When placed in
+setup/common, remote component import paths become challenging to resolve.
 """
 
 import warnings

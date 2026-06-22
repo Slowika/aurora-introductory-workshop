@@ -12,6 +12,22 @@ import torch
 from setup.components.finetuning.utils import get_datetime_range, get_lora_params
 
 
+def test_get_datetime_range_values() -> None:
+    """Return expected timestamps for a valid range."""
+    result = get_datetime_range(
+        start=datetime(2025, 1, 1, 0, tzinfo=UTC),
+        end=datetime(2025, 1, 2, 0, tzinfo=UTC),
+        step=timedelta(hours=6),
+    )
+    assert result == [
+        datetime(2025, 1, 1, 0, tzinfo=UTC),
+        datetime(2025, 1, 1, 6, tzinfo=UTC),
+        datetime(2025, 1, 1, 12, tzinfo=UTC),
+        datetime(2025, 1, 1, 18, tzinfo=UTC),
+        datetime(2025, 1, 2, 0, tzinfo=UTC),
+    ]
+
+
 def test_get_datetime_range_raises() -> None:
     """Test get_datetime_range raises for insufficient timestamps."""
     with pytest.raises(ValueError, match="Less than two timestamps generated"):

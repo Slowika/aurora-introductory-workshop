@@ -49,7 +49,7 @@ def load_model(
     *,
     train: bool,
     strict: bool = True,
-    **cfg: str,
+    **cfg: bool | int | str | tuple[str, ...],
 ) -> AuroraPretrained:
     """Load an Aurora pre-trained model from a local checkpoint.
 
@@ -62,7 +62,7 @@ def load_model(
     strict : bool, default = True
         Error if the model parameters are not exactly equal to the parameters in the
         checkpoint. Defaults to True.
-    cfg : dict[str, Any]
+    cfg : bool | int | str | tuple[str, ...]
         Additional keyword arguments to pass to the AuroraPretrained constructor.
 
     Returns
