@@ -6,37 +6,21 @@ NetCDF file at the specified output path. The final prediction is evaluated agai
 ground-truth data and relevant metrics and figures are logged with MLflow.
 
 Running locally:
-    python -m setup.components.inference.main \
-        --model <path to local model checkpoint e.g. ./aurora-0.25-pretrained.ckpt> \
-        --data <path to local initial state data e.g. ./era5_subset.zarr> \
-        --start_datetime <ISO 8601 format datetime e.g. 2026-01-01T00:00:00> \
-        --config <JSON-formatted string of inference configuration> \
-        --predictions <path to output NetCDF file of forecasts e.g. ./fcst.nc>
+    See notebooks/0_aurora_workshop_local.ipynb for example usage or run:
+    `python -m setup.components.inference.main -h`
 
 Running in Azure Machine Learning:
-    See setup/components/inference/component.py for definition and deployment, and
-    notebooks/0_aurora_workshop.ipynb for example usage.
+    See setup/components/inference/component.yaml for definition and
+    notebooks/0_aurora_workshop.ipynb for example usage. Deploy with
+    `az ml component create -f setup/components/inference/component.yaml -w <workspace>
+    -g <resource_group>`
 
-Key configuration parameters:
-- steps: Number of inference steps to perform.
-- mode: Whether to use synthetic data ("test") or real data ("era5").
-- [optional] aurora_config: Dictionary of Aurora model configuration parameters to
-    override the default model configuration, e.g.:
-    {"aurora_config": {"use_lora": true}}.
-    See aurora.Aurora documentation for all valid keyword arguments.
-    Required, with attribute "use_lora": true, when using LoRA fine-tuned models.
-- [optional] extra_variables: Dictionary defining additional variables to include, e.g.:
-    {
-        <variable_era5_longname>: {
-            "kind": <surf_vars or atmos_vars>,
-            "key": <variable_era5_shortname>
-        }
-    }
+For configuration, see examples in notebooks/inference_configs.yaml and the Pydantic
+model definition in `setup.components.common.models.InferenceConfig`.
 """
 
 import argparse
-import json
-from datetime import datetime
+from typing import TYPE_CHECKING, cast
 
 import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
@@ -45,108 +29,136 @@ import torch
 import xarray as xr
 from aurora import rollout
 
+if TYPE_CHECKING:
+    from cartopy.mpl.geoaxes import GeoAxes
+
 # NOTE: enable imports in local and remote environments
+# alternatively, use sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+# and remove the try/except, retaining only the top common import block
 try:
     from common.loss import rmse_loss
+    from common.models import InferenceConfig
     from common.utils import (
         batch_to_xarray,
         create_logger,
         load_model,
-        register_new_variables,
-        validate_common_config,
+        tz_naive_datetime,
     )
 except ImportError:
     from setup.components.common.loss import rmse_loss
+    from setup.components.common.models import InferenceConfig
     from setup.components.common.utils import (
         batch_to_xarray,
         create_logger,
         load_model,
-        register_new_variables,
-        validate_common_config,
+        tz_naive_datetime,
     )
 
-LOG = create_logger()
+LOG = create_logger(__name__)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Aurora Inference Component")
+    parser = argparse.ArgumentParser(description="Aurora Inference")
     parser.add_argument(
         "--model",
         type=str,
-        help="Path to the pre-trained model checkpoint.",
+        help=(
+            "Path to the pre-trained Microsoft Aurora model checkpoint to use in "
+            "inference."
+        ),
     )
     parser.add_argument(
         "--data",
         type=str,
-        help="Path to the training data, ignored if configured mode is test.",
+        help=(
+            "Path to the data containing the initial state for inference. Ignored if "
+            "configured mode is test."
+        ),
     )
     parser.add_argument(
         "--start_datetime",
-        type=datetime.fromisoformat,
+        type=tz_naive_datetime,
         help=(
-            "Start ISO 8601 format datetime e.g. 2025-01-01T00:00:00. "
-            "This datetime and that -6 hours must be present in the data."
+            "ISO 8601 format start datetime for initial state data e.g. "
+            "2025-01-01T00:00:00. This datetime and that -6 hours must be present in "
+            "the data."
         ),
     )
     parser.add_argument(
         "--config",
-        type=json.loads,
-        help="JSON string of inference configuration.",
+        type=InferenceConfig.model_validate_json,
+        help="JSON-serialised string of inference configuration.",
     )
     parser.add_argument(
         "--predictions",
         type=str,
-        help="Path to which output predictions will be written.",
+        help=(
+            "Path to which a NetCDF of forecasts generated by each step will be "
+            "written."
+        ),
     )
     args = parser.parse_args()
+    cfg: InferenceConfig = args.config
+    LOG.info("Starting inference run with config: %s", cfg.model_dump())
 
-    if (inf_steps := args.config.get("steps", 0)) < 1:
-        msg = "Absent or invalid 'steps' field, must be at least 1."
-        raise ValueError(msg)
-    batch_fn = validate_common_config(args.config)
-    var_map, var_cfg = register_new_variables(args.config.get("extra_variables", {}))
-    init_batch = batch_fn(
+    LOG.info("Loading initial state batch: path=%s", args.data)
+    init_batch = cfg.mode.batch_fn(
         data_path=args.data,
         start_datetime=args.start_datetime,
-        **var_map,
+        **cfg.variable_map,
     )
-    LOG.info("%s mode enabled.", args.config["mode"])
+    LOG.info(
+        "Loaded initial state batch: times=%s, variables=%s, levels=%s",
+        init_batch.metadata.time,
+        [*init_batch.surf_vars, *init_batch.atmos_vars, *init_batch.static_vars],
+        init_batch.metadata.atmos_levels,
+    )
 
     LOG.info("Loading model: path=%s", args.model)
-    cfg = args.config.get("aurora_config", {}) | var_cfg
-    model = load_model(args.model, train=False, **cfg)
-    LOG.info("Loaded model using config: %s", cfg)
+    model = load_model(args.model, train=False, **cfg.aurora_init_kwargs)
+    LOG.info("Loaded model: kwargs=%s", cfg.aurora_init_kwargs)
 
-    LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, inf_steps)
+    LOG.info("Starting inference: start=%s, steps=%d", args.start_datetime, cfg.steps)
+    pred = None
     with torch.inference_mode():
         datasets = []
-        for pred in rollout(model, init_batch, steps=inf_steps):
+        for pred in rollout(model, init_batch, steps=cfg.steps):
             LOG.info(
-                "Inference step complete: no=%s, timestamp=%s",
+                "Inference step complete: %d/%d, timestamp=%s",
                 pred.metadata.rollout_step,
+                cfg.steps,
                 pred.metadata.time[0].isoformat(timespec="hours"),
             )
             datasets.append(batch_to_xarray(pred))
-    LOG.info("Completed %d inference steps.", inf_steps)
     model = model.to("cpu")
 
+    # pred should never be None here, but guard for pylance
+    assert pred is not None, "No predictions generated, skipping write and evaluation."
     LOG.info("Concatenating and writing predictions: path=%s", args.predictions)
     preds_ds = xr.concat(datasets, dim="time")
     preds_ds.to_netcdf(args.predictions)
 
     LOG.info("Starting evaluation of surface variables.")
     eval_datetime = pred.metadata.time[0]
-    target = batch_fn(
+    LOG.info("Loading target batch: path=%s", args.data)
+    tgt_batch = cfg.mode.batch_fn(
         data_path=args.data,
         start_datetime=eval_datetime,
         times=1,
-        **var_map,
+        **cfg.variable_map,
     )
-    for longname, shortname in var_map["surf_vars"].items():
+    LOG.info(
+        "Loaded target batch: times=%s, variables=%s, levels=%s",
+        tgt_batch.metadata.time,
+        [*tgt_batch.surf_vars, *tgt_batch.atmos_vars, *tgt_batch.static_vars],
+        tgt_batch.metadata.atmos_levels,
+    )
+
+    for longname, shortname in cfg.variable_map["surf_vars"].items():
         LOG.info("Starting evaluation: variable=%s", longname)
-        target_t = target.surf_vars[shortname]
+        target_t = tgt_batch.surf_vars[shortname]
         prediction_t = pred.surf_vars[shortname]
 
-        # compute and log RMSE for the whole planet
+        # compute and log RMSE for the globe
         rmse = rmse_loss(prediction_t, target_t).item()
         LOG.info("RMSE: %.4f", rmse)
         mlflow.log_metric(f"{longname} RMSE", rmse)
@@ -155,6 +167,7 @@ if __name__ == "__main__":
         diff_t = (prediction_t - target_t).squeeze().cpu().numpy()
         fig = plt.figure(figsize=(40, 50))
         ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+        ax = cast("GeoAxes", ax)
         extent = (-180., 180., -90., 90.)
         ax.set_extent(extents=extent)
         ax.coastlines()
@@ -170,9 +183,12 @@ if __name__ == "__main__":
         plt.colorbar(im, ax=ax, orientation="horizontal", pad=0.05, shrink=0.8)
         ax.set_title(
             f"Predicted vs. ground-truth - {longname} - {eval_datetime} - "
-            f"{inf_steps} steps",
+            f"{cfg.steps} steps",
         )
-        mlflow.log_figure(fig, f"{longname}_{eval_datetime}_prediction_error_map.png")
+        mlflow.log_figure(
+            fig,
+            f"{longname}_{eval_datetime.isoformat(timespec='hours')}_prediction_error_map.png",
+        )
         plt.close(fig)
         LOG.info("Finished evaluation: variable=%s", longname)
 
