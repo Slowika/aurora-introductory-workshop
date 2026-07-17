@@ -21,6 +21,7 @@ model definition in `setup.components.common.models.FinetuneConfig`.
 import argparse
 from collections.abc import Callable
 from functools import partial
+from typing import Literal
 
 import numpy as np
 import torch
@@ -146,6 +147,7 @@ if __name__ == "__main__":
         batch_fn=batch_fn,
         timestamps=timestamps,
         epochs=cfg.epochs,
+        batches_per_epoch=cfg.batches_per_epoch,
         rollout_steps=cfg.rollout_steps,
         area_weighted=cfg.area_weighted,
     )

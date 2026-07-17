@@ -184,6 +184,8 @@ class FinetuneConfig(BaseConfig):
     """Number of autoregressive steps for rollout fine-tuning."""
     area_weighted: bool = False
     """Whether the MAE loss is area-weighted."""
+    batches_per_epoch: int | Literal["all"] = 1
+    """How many batches are sampled in each epoch (integer or 'all')."""
 
     @model_validator(mode="after")
     def _validate_rollout_steps(self) -> Self:
