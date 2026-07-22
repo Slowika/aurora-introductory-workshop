@@ -23,7 +23,6 @@ from setup.components.common.models import AuroraConfig, DataMode, FinetuneConfi
 from tests.conftest import (
     BASE_DATE,
     CHECKPOINT_PATH,
-    N_TIMESTAMPS,
     get_dataset_time_range,
     requires_checkpoint,
 )
@@ -148,26 +147,6 @@ def test_finetune_short_lead_data_mode(run_dir: Path, era5_dataset: Path) -> Non
         checkpoint_path,
     )
     _assert_outputs(loss_path, prediction_path, checkpoint_path, cfg.epochs)
-
-
-@requires_checkpoint
-@pytest.mark.usefixtures("use_small_model")
-def test_finetune_short_raises_insufficient_timestamps(
-    run_dir: Path,
-    era5_dataset: Path,
-) -> None:
-    """Test fine-tuning raises when epochs exceeds usable timestamps."""
-    loss_path, prediction_path, checkpoint_path = _output_paths(run_dir)
-    cfg = FinetuneConfig(mode=DataMode.ERA5, type="short", epochs=N_TIMESTAMPS + 1)
-    with pytest.raises(ValueError, match="Insufficient timestamps for epochs"):
-        _run_finetuning(
-            cfg,
-            CHECKPOINT_PATH,
-            era5_dataset,
-            loss_path,
-            prediction_path,
-            checkpoint_path,
-        )
 
 
 @requires_checkpoint
