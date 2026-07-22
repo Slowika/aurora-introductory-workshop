@@ -21,7 +21,6 @@ model definition in `setup.components.common.models.FinetuneConfig`.
 import argparse
 from collections.abc import Callable
 from functools import partial
-from typing import Literal
 
 import numpy as np
 import torch

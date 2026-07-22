@@ -94,15 +94,18 @@ def get_datetime_range(
     return timestamps
 
 
-def get_batches_sample_ts(
+def _get_batches_sample_ts(
         timestamps: list[datetime],
         rng: np.random.Generator,
         batches_per_epoch: int | Literal["all"] = 1,
 ) -> list[datetime]:
+    # The same timestamp can be sampled in multiple epochs and multiple times
+    # in a single epoch.
     return (
         timestamps if batches_per_epoch == "all"
         else list(rng.choice(timestamps, batches_per_epoch))
     )
+
 
 def finetune_short_lead(  # noqa: PLR0913
     model: Aurora,
@@ -146,7 +149,6 @@ def finetune_short_lead(  # noqa: PLR0913
 
     """
     use_ts = timestamps[:len(timestamps) - 1]
-    _check_timestamps(use_ts, epochs)
     loss_history: list[float] = []
     step = timestamps[1] - timestamps[0]
     rng = np.random.Generator(np.random.PCG64())
@@ -154,7 +156,7 @@ def finetune_short_lead(  # noqa: PLR0913
     pred = None
     for epoch in range(epochs):
         LOG.info("Starting fine-tuning epoch: %d/%d", epoch + 1, epochs)
-        chosen_ts = get_batches_sample_ts(use_ts, rng, batches_per_epoch)
+        chosen_ts = _get_batches_sample_ts(use_ts, rng, batches_per_epoch)
         loss_value = 0.0
         for start_datetime in chosen_ts:
             init_batch = batch_fn(start_datetime=start_datetime)
@@ -203,6 +205,8 @@ def finetune_autoregressive(  # noqa: PLR0913
         List of datetimes for fine-tuning data.
     epochs : int, default = 1
         Number of fine-tuning epochs.
+    batches_per_epoch : int | Literal["all"], default = 1
+        How many batches are randomly sampled in each epoch.
     rollout_steps : int, default = 4
         Number of autoregressive rollout steps per epoch.
     area_weighted : bool, default = false
@@ -217,7 +221,6 @@ def finetune_autoregressive(  # noqa: PLR0913
 
     """
     use_ts = timestamps[:len(timestamps) - rollout_steps]
-    _check_timestamps(use_ts, epochs)
     loss_history: list[float] = []
     step = timestamps[1] - timestamps[0]
     rng = np.random.Generator(np.random.PCG64())
@@ -226,7 +229,7 @@ def finetune_autoregressive(  # noqa: PLR0913
     for epoch in range(epochs):
         LOG.info("Starting fine-tuning epoch: %d/%d", epoch + 1, epochs)
         optimiser.zero_grad(set_to_none=True)
-        chosen_ts = get_batches_sample_ts(use_ts, rng, batches_per_epoch)
+        chosen_ts = _get_batches_sample_ts(use_ts, rng, batches_per_epoch)
         loss_value = 0.0
 
         for start_datetime in chosen_ts:
@@ -250,15 +253,6 @@ def finetune_autoregressive(  # noqa: PLR0913
 
     assert pred is not None, "No predictions generated during fine-tuning."
     return pred, loss_history
-
-
-def _check_timestamps(timestamps: list[datetime], epochs: int) -> None:
-    if epochs > len(timestamps):
-        msg = (
-            "Insufficient timestamps for epochs, reduce epochs or increase timestamp "
-            f"range: usable_timestamps={len(timestamps)}, epochs={epochs}"
-        )
-        raise ValueError(msg)
 
 
 def _log_epoch_complete(

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 import torch
 
-from setup.components.finetuning.utils import get_datetime_range, get_lora_params, get_batches_sample_ts
+from setup.components.finetuning.utils import get_datetime_range, get_lora_params, _get_batches_sample_ts
 
 
 def test_get_datetime_range_values() -> None:
@@ -54,7 +54,7 @@ def test_get_batches_sample_ts_all() -> None:
         datetime(2025, 1, 1, 12, tzinfo=UTC),
     ]
     rng = np.random.default_rng(seed=123)
-    result = get_batches_sample_ts(timestamps, rng, batches_per_epoch="all")
+    result = _get_batches_sample_ts(timestamps, rng, batches_per_epoch="all")
     assert result == [
         datetime(2025, 1, 1, 0, tzinfo=UTC),
         datetime(2025, 1, 1, 6, tzinfo=UTC),
@@ -70,7 +70,7 @@ def test_get_batches_sample_ts_default() -> None:
         datetime(2025, 1, 1, 12, tzinfo=UTC),
     ]
     rng = np.random.default_rng(seed=123)
-    result = get_batches_sample_ts(timestamps, rng)
+    result = _get_batches_sample_ts(timestamps, rng)
     assert result == [
         datetime(2025, 1, 1, 0, tzinfo=UTC),
     ]
@@ -84,7 +84,7 @@ def test_get_batches_sample_ts_two() -> None:
         datetime(2025, 1, 1, 12, tzinfo=UTC),
     ]
     rng = np.random.default_rng(seed=123)
-    result = get_batches_sample_ts(timestamps, rng, batches_per_epoch=2)
+    result = _get_batches_sample_ts(timestamps, rng, batches_per_epoch=2)
     assert result == [
         datetime(2025, 1, 1, 0, tzinfo=UTC),
         datetime(2025, 1, 1, 12, tzinfo=UTC),
