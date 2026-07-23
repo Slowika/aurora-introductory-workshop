@@ -8,6 +8,24 @@ test_short_lead:
   aurora_config:
     autocast: true
 
+test_short_lead_2:
+  type: short
+  mode: test
+  epochs: 5
+  batches_per_epoch: 2
+  learning_rate: 3e-5
+  aurora_config:
+    autocast: true
+
+test_short_lead_all:
+  type: short
+  mode: test
+  epochs: 5
+  batches_per_epoch: all
+  learning_rate: 3e-5
+  aurora_config:
+    autocast: true
+
 era5_short_lead:
   type: short
   mode: era5
@@ -31,6 +49,17 @@ test_autoregressive:
   type: rollout
   mode: test
   epochs: 5
+  rollout_steps: 4
+  learning_rate: 3e-5
+  aurora_config:
+    use_lora: false
+    autocast: true
+
+test_autoregressive_2:
+  type: rollout
+  mode: test
+  epochs: 5
+  batches_per_epoch: 2
   rollout_steps: 4
   learning_rate: 3e-5
   aurora_config:

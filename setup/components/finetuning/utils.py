@@ -3,6 +3,7 @@
 import dataclasses
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -93,6 +94,19 @@ def get_datetime_range(
     return timestamps
 
 
+def _get_batches_sample_ts(
+        timestamps: list[datetime],
+        rng: np.random.Generator,
+        batches_per_epoch: int | Literal["all"] = 1,
+) -> list[datetime]:
+    # The same timestamp can be sampled in multiple epochs and multiple times
+    # in a single epoch.
+    return (
+        timestamps if batches_per_epoch == "all"
+        else list(rng.choice(timestamps, batches_per_epoch))
+    )
+
+
 def finetune_short_lead(  # noqa: PLR0913
     model: Aurora,
     params: list[torch.nn.Parameter],
@@ -100,6 +114,7 @@ def finetune_short_lead(  # noqa: PLR0913
     batch_fn: Callable[..., Batch],
     timestamps: list[datetime],
     epochs: int = 1,
+    batches_per_epoch: int | Literal["all"] = 1,
     *,
     area_weighted: bool = False,
     **_: dict,
@@ -120,6 +135,8 @@ def finetune_short_lead(  # noqa: PLR0913
         List of datetimes for fine-tuning data.
     epochs : int, default = 1
         Number of fine-tuning epochs.
+    batches_per_epoch : int | Literal["all"], default = 1
+        How many batches are randomly sampled in each epoch.
     area_weighted : bool, default = false
         Whether the loss function being used is area-weighted.
 
@@ -132,7 +149,6 @@ def finetune_short_lead(  # noqa: PLR0913
 
     """
     use_ts = timestamps[:len(timestamps) - 1]
-    _check_timestamps(use_ts, epochs)
     loss_history: list[float] = []
     step = timestamps[1] - timestamps[0]
     rng = np.random.Generator(np.random.PCG64())
@@ -140,12 +156,14 @@ def finetune_short_lead(  # noqa: PLR0913
     pred = None
     for epoch in range(epochs):
         LOG.info("Starting fine-tuning epoch: %d/%d", epoch + 1, epochs)
-        start_datetime = use_ts.pop(rng.integers(0, len(use_ts)))
-        init_batch = batch_fn(start_datetime=start_datetime)
-        tgt_batch = batch_fn(start_datetime=init_batch.metadata.time[0] + step, times=1)
-        optimiser.zero_grad(set_to_none=True)
-        pred = model.forward(init_batch)
-        loss_value = weighted_mae(pred, tgt_batch, area_weighted=area_weighted)
+        chosen_ts = _get_batches_sample_ts(use_ts, rng, batches_per_epoch)
+        loss_value = 0.0
+        for start_datetime in chosen_ts:
+            init_batch = batch_fn(start_datetime=start_datetime)
+            tgt_batch = batch_fn(start_datetime=init_batch.metadata.time[0] + step, times=1)
+            optimiser.zero_grad(set_to_none=True)
+            pred = model.forward(init_batch)
+            loss_value += weighted_mae(pred, tgt_batch, area_weighted=area_weighted)
         loss_value.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         optimiser.step()
@@ -163,6 +181,7 @@ def finetune_autoregressive(  # noqa: PLR0913
     batch_fn: Callable[..., Batch],
     timestamps: list[datetime],
     epochs: int = 1,
+    batches_per_epoch: int | Literal["all"] = 1,
     rollout_steps: int = 4,
     *,
     area_weighted: bool = False,
@@ -186,6 +205,8 @@ def finetune_autoregressive(  # noqa: PLR0913
         List of datetimes for fine-tuning data.
     epochs : int, default = 1
         Number of fine-tuning epochs.
+    batches_per_epoch : int | Literal["all"], default = 1
+        How many batches are randomly sampled in each epoch.
     rollout_steps : int, default = 4
         Number of autoregressive rollout steps per epoch.
     area_weighted : bool, default = false
@@ -200,7 +221,6 @@ def finetune_autoregressive(  # noqa: PLR0913
 
     """
     use_ts = timestamps[:len(timestamps) - rollout_steps]
-    _check_timestamps(use_ts, epochs)
     loss_history: list[float] = []
     step = timestamps[1] - timestamps[0]
     rng = np.random.Generator(np.random.PCG64())
@@ -209,19 +229,22 @@ def finetune_autoregressive(  # noqa: PLR0913
     for epoch in range(epochs):
         LOG.info("Starting fine-tuning epoch: %d/%d", epoch + 1, epochs)
         optimiser.zero_grad(set_to_none=True)
-        start_datetime = use_ts.pop(rng.integers(0, len(use_ts)))
-        init_batch = batch_fn(start_datetime=start_datetime)
+        chosen_ts = _get_batches_sample_ts(use_ts, rng, batches_per_epoch)
+        loss_value = 0.0
 
-        with torch.no_grad():
-            for istep in range(1, rollout_steps):
-                pred = model.forward(init_batch)
-                init_batch = update_batch(init_batch, pred)
-                LOG.info("Inference step complete: %d/%d", istep, rollout_steps)
+        for start_datetime in chosen_ts:
+            init_batch = batch_fn(start_datetime=start_datetime)
 
-        tgt_batch = batch_fn(start_datetime=init_batch.metadata.time[0] + step, times=1)
-        pred = model.forward(init_batch)
-        LOG.info("Inference step complete: %d/%d", *[rollout_steps] * 2)
-        loss_value = weighted_mae(pred, tgt_batch, area_weighted=area_weighted)
+            with torch.no_grad():
+                for istep in range(1, rollout_steps):
+                    pred = model.forward(init_batch)
+                    init_batch = update_batch(init_batch, pred)
+                    LOG.info("Inference step complete: %d/%d", istep, rollout_steps)
+
+            tgt_batch = batch_fn(start_datetime=init_batch.metadata.time[0] + step, times=1)
+            pred = model.forward(init_batch)
+            LOG.info("Inference step complete: %d/%d", *[rollout_steps] * 2)
+            loss_value += weighted_mae(pred, tgt_batch, area_weighted=area_weighted)
         loss_value.backward()
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         optimiser.step()
@@ -230,15 +253,6 @@ def finetune_autoregressive(  # noqa: PLR0913
 
     assert pred is not None, "No predictions generated during fine-tuning."
     return pred, loss_history
-
-
-def _check_timestamps(timestamps: list[datetime], epochs: int) -> None:
-    if epochs > len(timestamps):
-        msg = (
-            "Insufficient timestamps for epochs, reduce epochs or increase timestamp "
-            f"range: usable_timestamps={len(timestamps)}, epochs={epochs}"
-        )
-        raise ValueError(msg)
 
 
 def _log_epoch_complete(
